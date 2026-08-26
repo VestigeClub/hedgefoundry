@@ -1,19 +1,42 @@
-# Finance Game (working title — HedgeFoundry)
+# HedgeFoundry
 
-Factorio, but you run a hedge fund. A school assignment: build a
-factory-automation game where you mine market data, process signals,
-assemble trading strategies, defend against finance bros, and hit your
-hiring quota to IPO.
+Factorio, but you run a hedge fund. A school assignment: mine market data,
+process signals, assemble trading strategies, defend against finance bros,
+and hit your hiring quota to IPO.
 
-Status: **M1 — engine foundation.** Stack live: TypeScript strict + Vite +
-Vitest, gate `npm run check` green. Full design in `docs/DESIGN.md`.
+Status: **M1–M7 shipped.** TypeScript strict + Vite + Vitest, gate
+`npm run check` green (75 tests). Full design in `docs/DESIGN.md`.
 
-## Run
+## Play
+
 ```sh
 npm install
-npm run dev        # dev server → http://localhost:5173
-npm run check      # typecheck + tests + production build
-node server/relay.mjs   # (later) live market data relay
+npm run check       # typecheck + tests + production build (the gate)
+npm run dev         # dev server → http://localhost:5173
+node server/relay.mjs   # live market relay → serves the built game on :7891
 ```
+
+- **Live market data**: the relay streams real BTC/ETH/SOL marks + candles
+  (read-only) from a market-data server you configure; without it, the game runs on a
+  deterministic simulated feed (LIVE/SIM chip in the corner).
+- **Zero install for the professor**: `npm run build && node server/relay.mjs`,
+  then open `http://<this-machine-ip>:7891` in any browser.
+- **Cinematic demo**: open `http://localhost:5173/?demo` (or the relay's
+  `:7891/?demo`) — a scripted autoplayer builds the rig, fights off bros,
+  hires 250, and launches the IPO on its own.
+- **Controls**: `1–0, Q, E, G` build · `R` rotate · `T` research · `X` remove ·
+  `WASD`/arrows pan · wheel zoom · middle-drag pan. Click a bro → HIRE.
+- Autosaves every 10s (resume on reload; NEW GAME clears).
+
+## Rules
+
+- Mine **RAW DATA** from data feeds → clean → signals → alpha → fund the
+  IPO roadshow. Machines burn **capital**; funding desks + treasury vaults
+  keep the grid alive (brownout when reserves run low).
+- Machines leak **market impact** → attracts **finance bros** in growing
+  waves. Hire them (comp + quota) or shred them with compliance towers
+  (legal-brief ammo). Quota 250 + roadshow = **IPO** (win).
+- Margin call (10s at zero capital) or a destroyed HQ = **liquidation**
+  (loss). Every run is deterministic: same seed + actions = same result.
 
 Runs on Windows, macOS, and in any browser (web-first target).

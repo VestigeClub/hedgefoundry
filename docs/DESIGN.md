@@ -302,8 +302,15 @@ All in game units. Capital starts **$1,000,000**. Base burn vs funding:
   spawn mix + comp.
 - Research: each tech costs craft-points (5–18 lab crafts, one desk ~1–3 min
   per tech); ~6–10 techs per playthrough.
+- Roadshow: consumes 400 Alpha at 4/s (~100 s sustained delivery) once the
+  hire quota is met; build cost $2M.
 - Tuning method: Vitest simulation harness runs scripted "optimal" play →
   assert IPO reachable by ~40–50 min; defeat possible by neglect ~15 min.
+- **Known tension (tuning pass pending)**: funding income caps at
+  `capitalCapacity` (1M + 50K/vault) while the 250-hire quota costs ~$5M+ in
+  comp — a full playthrough needs either more vaults, cheaper comps, or a
+  higher funding ceiling. The demo mode sidesteps this with a seed-round
+  top-up; the real-game economy needs a balance pass before hand-in.
 
 ## 12. Milestones (2 weeks, from 2026-08-25)
 - **M1 (d1–2)**: stack up (Vite+TS+Vitest+gate), engine core (loop, camera,
@@ -321,6 +328,19 @@ All in game units. Capital starts **$1,000,000**. Base burn vs funding:
 - **M7 (d12–14)**: end-game report, demo mode (scripted auto-play + camera
   flythrough), cross-platform verification (Windows Chrome/Edge, MacBook
   Safari/Chrome, professor browser), README play guide, presentation assets.
+
+## 12b. Shipped status (2026-08-25 →)
+- **Done**: M1–M7 sim + UI (production chain, belts/traders, power/brownout,
+  research, bros/impact/defense, hire, HQ, margin call, IPO roadshow,
+  win/lose overlays + end-game report with capital sparkline), live market
+  relay (L1 read-only) with client-side SimFeed fallback, autosave +
+  resume, WebAudio synth SFX, `?demo` cinematic autoplay.
+- **Gate**: `npm run check` = typecheck + 75 Vitest tests + Vite build.
+- **Verified live**: Windows Chrome via headless driver (production flow,
+  bro raids, tower defense, hiring, save/resume, demo IPO win).
+- **Cross-platform**: any browser opens `http://<host>:7891` (relay serves
+  `dist/`); zero install. MacBook on LAN (ping OK, SSH closed) — Safari/
+  Chrome check pending on-site.
 
 ## 13. Non-goals (scope guard — v1)
 No fluids/derivatives, no logistics bots, no circuit network, no blueprints,
