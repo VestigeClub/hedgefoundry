@@ -1,0 +1,4 @@
+{"ch":"ctx","coin":"BTC","mark":77152.0,"oi_base":33513.24778,"oi_usd":2585614092.72256,"funding_hourly":1.25e-05,"ts_ms":1787337671713}
+{"ch":"candle","coin":"ETH","tf":"1m","bar":{"t":1787337660000,"o":2420.6,"h":2420.6,"l":2419.3,"c":2419.3,"v":118.3136}}
+{"ch":"cvd","coin":"SOL","venue":"hyperliquid","bucket":{"t":1787337660000,"buy_usd":414.52695000000006,"sell_usd":22893.4839,"delta_usd":-22478.95695,"cvd_usd":-273376.5073399998,"session_start_ms":1787270400000}}
+{"ch":"liq","event":{"t":1787337674201,"coin":"LIT","venue":"binance","side":"short","price":3.03676,"qty":41.6,"notional_usd":126.32921600000002,"capture_t":1787337675304,"latency_ms":1103,"source":"!forceOrder@arr"}}

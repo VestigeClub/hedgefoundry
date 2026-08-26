@@ -196,15 +196,23 @@ Dropped: `book`, `bookheat` (L2 depth), `whale` (too heavy + gated), `brief`,
 
 Architecture:
 ```
-the desk (desk-host:5299, read-only WS) ─┐
-                                        ├─► server/relay.mjs (Node 24, zero-dep)
-synthetic generator (seeded RNG) ───────┘     │  ws://localhost:7891/stream
-                                              ▼
-                                  browser game client (same wire format)
+the desk (desk-host:5299, read-only WS) ──► server/relay.mjs (Node 24, zero-dep)
+                                            │  :7891/stream  SSE — L1 live passthrough
+                                            │  :7891/seed    realized vol, 2d 1m candles
+                                            │  :7891/        serves dist/ statically
+                                            ▼
+                                  browser game client
+                                  └─ relay silent >2 s → embedded SimFeed (same wire)
 ```
-- Relay: connects to the desk; on failure/offline, **auto-falls back to a
-  synthetic generator** producing the same frame shapes (seeded per world).
-  Status field in every relay frame: `src: "live" | "sim"`.
+**Relay** (`server/relay.mjs`, Node 24, zero-dep): one read-only WS client to
+the desk (broadcast-all — the server is built for multiple consumers); filters
+to the L1 subset; re-serves as **SSE** (`/stream`) so the browser needs no
+WS handshake. Also serves `/seed` (realized vol from 2 days of 1m BTC
+candles — `{coin,tf,bars:[{t,o,h,l,c,v}]}` shape verified from the desk
+fixture) and `dist/` statically (LAN demo = one process). Every relay frame
+carries `src: "live"`. If the relay is unreachable or silent for 2 s, the
+**client falls back to its embedded deterministic SimFeed** (`src: "sim"`)
+— the professor's demo never depends on the LAN.
 - Game wire format (game-defined, one JSON line per frame):
   `{"src":"live","ch":"ctx","coin":"BTC","mark":77152.0,"funding_hourly":0.00011,"ts_ms":…}`
   `{"src":"live","ch":"candle","coin":"BTC","tf":"1m","bar":{"t":…,"o":…,"h":…,"l":…,"c":…,"v":…}}`

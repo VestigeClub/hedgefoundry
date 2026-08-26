@@ -35,16 +35,82 @@ body {
   cursor: crosshair;
 }
 
-#title-chip {
+/* Ticker tape — live/sim market marks (DESIGN.md §6, §8) */
+#ticker {
   position: fixed;
-  top: 8px;
-  right: 8px;
-  padding: 3px 8px;
-  border: 1px solid var(--grid);
-  border-radius: 3px;
-  background: rgba(10, 14, 20, 0.85);
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  background: rgba(10, 14, 20, 0.92);
+  border-bottom: 1px solid var(--grid);
+  overflow: hidden;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.tick-coin {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0 14px;
+  border-right: 1px solid var(--grid);
+  font-size: 12px;
+  line-height: 28px;
+}
+
+.tick-coin b {
   color: var(--dim);
-  font-size: 11px;
-  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+
+.tick-coin .px {
+  color: var(--text);
+}
+
+.tick-coin .arrow.up {
+  color: var(--up);
+}
+
+.tick-coin .arrow.down {
+  color: var(--down);
+}
+
+.tick-coin .arrow.flat {
+  color: var(--dim);
+}
+
+.tick-coin .fnd {
+  color: var(--dim);
+  font-size: 10px;
+}
+
+#feed-chip {
+  position: fixed;
+  top: 34px;
+  right: 8px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  background: rgba(10, 14, 20, 0.85);
+  border: 1px solid var(--grid);
+  z-index: 10;
   pointer-events: none;
+}
+
+#feed-chip.live {
+  color: var(--up);
+  border-color: var(--up);
+}
+
+#feed-chip.sim {
+  color: var(--amber);
+  border-color: var(--amber);
+}
+
+#feed-chip.connecting {
+  color: var(--dim);
 }
