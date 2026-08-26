@@ -217,9 +217,10 @@ carries `src: "live"`. If the relay is unreachable or silent for 2 s, the
   `{"src":"live","ch":"ctx","coin":"BTC","mark":77152.0,"funding_hourly":0.00011,"ts_ms":…}`
   `{"src":"live","ch":"candle","coin":"BTC","tf":"1m","bar":{"t":…,"o":…,"h":…,"l":…,"c":…,"v":…}}`
   `{"src":"live","ch":"liq","coin":"BTC","venue":"binance","side":"buy","price":…,"notional_usd":…}`
-- World seeding: on new game, relay fetches `GET /api/candles?coin=BTC&tf=1m`
-  (2 days) → realized vol → map richness/volatility distribution + starting
-  ticker values. Sim mode: same call from the generator's RNG.
+World seeding: on new game the client calls the relay's `/seed`, which fetches
+`GET /api/candles?coin=BTC&tf=1m` (2 days) → realized vol → map
+richness/volatility distribution + starting ticker values. Relay down →
+client uses its fixed sim seed values — no server needed anywhere.
 - UI: `LIVE` / `SIM` chip; live mode shows real coin marks on the tape; bro
   burst events labeled `MARKET STRESS: BTC 5.2M liquidation`.
 
