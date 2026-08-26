@@ -256,3 +256,96 @@ body {
 #toast.show {
   opacity: 1;
 }
+
+/* Research panel */
+#research {
+  position: fixed;
+  top: 100px;
+  right: 8px;
+  width: 280px;
+  max-height: calc(100vh - 260px);
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--grid);
+  border-radius: 4px;
+  background: rgba(15, 22, 32, 0.95);
+  color: var(--text);
+  font-size: 12px;
+  display: none;
+  z-index: 12;
+}
+
+#research.open {
+  display: block;
+}
+
+.r-title {
+  color: var(--amber);
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--grid);
+  padding-bottom: 4px;
+}
+
+.r-hint {
+  color: var(--dim);
+  font-weight: 400;
+}
+
+.tech-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border: 1px solid var(--grid);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tech-row:hover {
+  border-color: var(--cyan);
+}
+
+.tech-row .tech-name {
+  color: var(--text);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.tech-row .tech-desc {
+  color: var(--dim);
+}
+
+.tech-row .tech-cost {
+  color: var(--dim);
+  font-size: 10px;
+}
+
+.tech-row.sel {
+  border-color: var(--cyan);
+}
+
+.tech-row.sel .tech-cost {
+  color: var(--cyan);
+}
+
+.tech-row.done {
+  opacity: 0.55;
+}
+
+.tech-row.done .tech-cost {
+  color: var(--up);
+}
+
+.tech-row.blocked {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

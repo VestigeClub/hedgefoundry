@@ -125,14 +125,18 @@ All machines: fixed craft recipe, no quality tiers (v1), buffer of 1 craft.
   → **DEFEAT**. Brief grace alarm at 5 s.
 
 ### 5.5 Research — the tree
-Costs: Alpha + Signals, consumed at Research Desk. Research time scales.
-1. **Extraction**: Miner Speed I/II (+25%), Miner Yield I (+10% patch yield)
-2. **Processing**: Cleaner Speed I, Analytics Speed I, Factory Speed I
-3. **Logistics**: Tape Speed I/II, Dark Pool range, Trader Speed I/II
-4. **Funding**: Fuel Tier I (Signals), Fuel Tier II (Alpha), Vault Capacity I/II
-5. **Defense**: Compliance Range I, Tower Damage I/II, Brief Efficiency (1→3 per craft)
-6. **Hiring**: Comp Discount I/II (−15%/−30% hire comp)
-7. **Markets**: Market Maker I (trains)
+The Research Desk crafts the "research" recipe (1 Alpha + 1 Signal per craft,
+10 s); each completed craft adds one point toward the SELECTED tech (set via
+the research panel, key T). At the tech's cost in points it applies and the
+desk moves on. Desk idles without a target. Current tree (12 techs):
+1. **Extraction**: Miner Speed I (+25% rate), Miner Yield I (+10% patch yield)
+2. **Processing**: Cleaner Speed I, Analytics Speed I, Factory Speed I (+25% each)
+3. **Logistics**: Tape Speed I/II (+25%/+50%), Trader Speed I (+25%)
+4. **Funding**: Fuel Tier I (burns SIGNALS · 160 CAP/s), Fuel Tier II (burns
+   ALPHA · 600 CAP/s), Vault Capacity I/II (+50K reserve each)
+5. **Defense** (M5): Compliance Range I, Tower Damage I/II, Brief Efficiency
+6. **Hiring** (M5): Comp Discount I/II (−15%/−30% hire comp)
+7. **Markets** (M6): Market Maker I (trains)
 
 ### 5.6 Market Impact — the pollution analog
 - Every running machine emits **Impact** (per burn unit: 1 Impact/s per 10 burn).
@@ -292,8 +296,8 @@ All in game units. Capital starts **$1,000,000**. Base burn vs funding:
 - Bros: Analyst comp $20k, Trader $60k, MD $180k, Quant $500k. Quota 250.
   Evolution: 0→1 over ~45 min of active impact at moderate play; affects
   spawn mix + comp.
-- Research: each tech costs Alpha+Signals (ramping 100→2,000 Alpha); ~6–10
-  techs per playthrough.
+- Research: each tech costs craft-points (5–18 lab crafts, one desk ~1–3 min
+  per tech); ~6–10 techs per playthrough.
 - Tuning method: Vitest simulation harness runs scripted "optimal" play →
   assert IPO reachable by ~40–50 min; defeat possible by neglect ~15 min.
 

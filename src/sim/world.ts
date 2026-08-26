@@ -6,6 +6,7 @@ import { Rng } from "./rng";
 import { createBuffer, type Buffer } from "./production";
 import { Crafter } from "./production";
 import { RECIPES } from "./recipes";
+import { DEFAULT_TECH, type TechState } from "./research";
 
 export type Dir = "N" | "E" | "S" | "W";
 export const DIRS: readonly Dir[] = ["N", "E", "S", "W"];
@@ -39,6 +40,8 @@ export interface Entity {
   w: number;
   h: number;
   machine?: { crafter: Crafter };
+  /** Captured research target while the desk crafts (research machines). */
+  researchTarget?: string | null;
   miner?: { output: Buffer; rateAcc: number };
   funding?: { input: Buffer; fuelAcc: number };
   belt?: { dir: Dir; speed: number; items: BeltItem[] };
@@ -113,6 +116,10 @@ export class World {
   multiplier = 1;
   demandPerSec = 0;
   totals: Record<Item, number> = { tape: 0, clean: 0, signal: 0, alpha: 0, brief: 0 };
+  tech: TechState = { ...DEFAULT_TECH };
+  researched = new Set<string>();
+  researchTarget: string | null = null;
+  researchPoints = 0;
 
   constructor(opts: WorldOpts) {
     this.map = opts.map;
@@ -124,7 +131,13 @@ export class World {
   capitalCapacity(): number {
     let vaults = 0;
     for (const e of this.entities.values()) if (e.kind === "vault") vaults++;
-    return BASE_CAPITAL_CAP + vaults * VAULT_CAPACITY;
+    return BASE_CAPITAL_CAP + vaults * VAULT_CAPACITY + this.tech.vaultCapLvl * VAULT_CAPACITY;
+  }
+
+  /** Point the Research Desk at a tech; resets progress on change. */
+  setResearchTarget(id: string | null): void {
+    this.researchTarget = id;
+    this.researchPoints = 0;
   }
 
   feedAt(tx: number, ty: number): FeedPatch | null {
@@ -169,8 +182,11 @@ export class World {
       case "analytics":
       case "factory":
       case "printer":
-      case "research":
         e.machine = { crafter: new Crafter(RECIPES[recipeFor(kind)]!) };
+        break;
+      case "research":
+        // Labs buffer a research run: 12 slots (6 crafts of alpha+signal).
+        e.machine = { crafter: new Crafter(RECIPES.research!, 12, 4) };
         break;
       case "miner":
         e.miner = { output: createBuffer(4), rateAcc: 0 };

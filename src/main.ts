@@ -16,6 +16,7 @@ import { Ticker } from "./ui/ticker";
 import { Hud } from "./ui/hud";
 import { Panel } from "./ui/panel";
 import { BuildController } from "./ui/build";
+import { ResearchPanel } from "./ui/research";
 import type { TileMap } from "./world/tilemap";
 
 // Dev/verification hook: lets browser automation drive and inspect the sim.
@@ -93,6 +94,7 @@ const build = new BuildController(
   },
   document.querySelector<HTMLElement>("#buildbar")!,
 );
+const research = new ResearchPanel(document.querySelector<HTMLElement>("#research")!, world);
 
 // World seed from the relay (realized vol) — consumed by world-gen later.
 fetchWorldSeed(relayBase()).then((ws) => {
@@ -155,6 +157,8 @@ function renderFrame(dt: number): void {
   }
 
   build.update();
+  if (input.keys.has("KeyT")) research.toggle();
+  research.update();
 
   drawMap(ctx, map, camera);
   drawEntities(ctx, world, camera, world.timeMs);

@@ -8,6 +8,7 @@
 import { DX, DY, type Dir, type Entity, type World } from "./world";
 import type { Item } from "./items";
 import { bufferAdd, bufferCount, bufferTake } from "./production";
+import { TECH_BY_ID, applyTech } from "./research";
 
 export function tickWorld(w: World, dtMs: number): void {
   w.timeMs += dtMs;
@@ -46,17 +47,23 @@ export function tickWorld(w: World, dtMs: number): void {
 function updateFunding(w: World, e: Entity, dtMs: number): void {
   if (!w.powered.has(e.id)) return;
   const f = e.funding!;
-  const want = 2 * (dtMs / 1000); // T0 fuel: clean data/s (research unlocks tiers, M4)
-  const have = bufferCount(f.input, "clean");
+  const TIERS = [
+    { fuel: "clean", rate: 2, out: 40 },
+    { fuel: "signal", rate: 4, out: 160 },
+    { fuel: "alpha", rate: 2, out: 600 },
+  ] as const;
+  const tier = TIERS[Math.min(w.tech.fuelTier, TIERS.length - 1)]!;
+  const want = tier.rate * (dtMs / 1000);
+  const have = bufferCount(f.input, tier.fuel);
   const availRatio = want > 0 ? Math.min(1, have / want) : 0;
   f.fuelAcc += want;
   const whole = Math.floor(f.fuelAcc);
   const taken = Math.min(whole, have);
-  bufferTake(f.input, "clean", taken);
+  bufferTake(f.input, tier.fuel, taken);
   f.fuelAcc -= taken;
   // Production runs continuously at the fuel-availability ratio; integer
   // consumption is just the bookkeeping rhythm.
-  w.capital = Math.min(w.capitalCapacity(), w.capital + 40 * (dtMs / 1000) * availRatio);
+  w.capital = Math.min(w.capitalCapacity(), w.capital + tier.out * (dtMs / 1000) * availRatio);
 }
 
 function updateMiner(w: World, e: Entity, dtMs: number): void {
@@ -64,7 +71,9 @@ function updateMiner(w: World, e: Entity, dtMs: number): void {
   const m = e.miner!;
   const richness = w.feedAt(e.x, e.y)?.richness ?? 0;
   if (richness <= 0) return; // placed off-patch: idle (shouldn't happen; canPlace guards)
-  m.rateAcc += 1 * richness * (dtMs / 1000) * w.multiplier;
+  const speedMult = 1 + 0.25 * w.tech.minerSpeed;
+  const yieldMult = 1 + 0.1 * w.tech.minerYield;
+  m.rateAcc += 1 * richness * yieldMult * speedMult * (dtMs / 1000) * w.multiplier;
   while (m.rateAcc >= 1) {
     if (bufferAdd(m.output, "tape", 1) === 0) break; // output full; hold the fraction
     m.rateAcc -= 1;
@@ -80,8 +89,29 @@ function updateMachine(w: World, e: Entity, dtMs: number): void {
   const powered = w.powered.has(e.id);
   const mult = powered ? w.multiplier : 0;
   const crafter = e.machine!.crafter;
+  // Research desks idle without a target; machines scale with tech speed.
+  if (crafter.recipe.id === "research" && !w.researchTarget) return;
+  const speedMult = machineSpeedMult(w, e);
   const wasCrafting = crafter.crafting;
-  crafter.tick(dtMs, mult);
+  crafter.tick(dtMs * speedMult, mult);
+  if (crafter.recipe.id === "research") {
+    if (!wasCrafting && crafter.crafting) {
+      e.researchTarget = w.researchTarget;
+    }
+    if (wasCrafting && !crafter.crafting && e.researchTarget) {
+      const target = e.researchTarget!;
+      e.researchTarget = null;
+      if (target && !w.researched.has(target)) {
+        w.researchPoints += 1;
+        const def = TECH_BY_ID.get(target);
+        if (def && w.researchPoints >= def.cost) {
+          applyTech(w, target);
+          w.researchPoints = 0;
+          w.setResearchTarget(null);
+        }
+      }
+    }
+  }
   if (wasCrafting && !crafter.crafting) {
     // Craft completed: move outputs onto adjacent belts; remainder stays in
     // the output buffer for traders.
@@ -92,6 +122,19 @@ function updateMachine(w: World, e: Entity, dtMs: number): void {
         bufferTake(crafter.output, item as Item, 1);
       }
     }
+  }
+}
+
+function machineSpeedMult(w: World, e: Entity): number {
+  switch (e.kind) {
+    case "cleaner":
+      return 1 + 0.25 * w.tech.cleanerSpeed;
+    case "analytics":
+      return 1 + 0.25 * w.tech.analyticsSpeed;
+    case "factory":
+      return 1 + 0.25 * w.tech.factorySpeed;
+    default:
+      return 1;
   }
 }
 
@@ -107,7 +150,7 @@ function beltPush(e: Entity, item: Item, pos: number): void {
 
 function updateBelt(w: World, e: Entity, dtMs: number): void {
   const b = e.belt!;
-  const advance = b.speed * (dtMs / 1000);
+  const advance = b.speed * (1 + 0.25 * w.tech.tapeSpeed) * (dtMs / 1000);
   const items = b.items;
   // Front-to-back: front item (highest pos) tries to exit; others follow.
   for (let i = items.length - 1; i >= 0; i--) {
@@ -169,7 +212,6 @@ function pushToAdjacentBelt(w: World, e: Entity, item: Item): boolean {
   return false;
 }
 
-const TRADER_COOLDOWN_MS = 2_000;
 const TRADER_SWING_MS = 350;
 const PICKUP_POS = 0.75;
 
@@ -220,6 +262,6 @@ function updateTrader(w: World, e: Entity, dtMs: number): void {
   } else if (dest.machine) {
     bufferAdd(dest.machine.crafter.input, item, 1);
   }
-  t.cooldownMs = TRADER_COOLDOWN_MS;
+  t.cooldownMs = 2_000 / (1 + 0.25 * w.tech.traderSpeed);
   t.busyMs = TRADER_SWING_MS;
 }
