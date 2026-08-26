@@ -283,7 +283,9 @@ function updateTrader(w: World, e: Entity, dtMs: number): void {
 
 const IMPACT_EMIT_PER_BURN = 0.05; // impact units per burn per second
 const IMPACT_DECAY = 0.98;
-const IMPACT_SPREAD = 0.008;
+// Decay + 4-way spread must sum < 1 per tick or the field amplifies to
+// infinity (0.98 + 4×0.004 = 0.996).
+const IMPACT_SPREAD = 0.004;
 
 function updateImpact(w: World, dtMs: number): void {
   const sec = dtMs / 1000;
@@ -389,7 +391,8 @@ function updateBro(w: World, e: Entity, dtMs: number): void {
   let target: Entity | null = null;
   let bestD = Infinity;
   for (const other of w.entities.values()) {
-    if (other.id === e.id || other.hp === undefined) continue;
+    // Bros never target each other — they raid structures.
+    if (other.id === e.id || other.hp === undefined || other.kind === "bro") continue;
     const d = distTiles(e, other);
     if (d < bestD) {
       bestD = d;
@@ -402,6 +405,37 @@ function updateBro(w: World, e: Entity, dtMs: number): void {
       w.damageEntity(target.id, stats.dmg);
       b.atkCdMs = 1_000;
     }
+    return;
+  }
+
+  // Chase the nearest structure when close (direct pursuit; the impact
+  // gradient alone stalls bros at the blob's local maximum).
+  if (target && bestD <= 10) {
+    const tcx = target.x + target.w / 2;
+    const tcy = target.y + target.h / 2;
+    let bdx = 0;
+    let bdy = 0;
+    let bd = Math.hypot(b.xf - tcx, b.yf - tcy);
+    for (const [dx, dy] of [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const) {
+      const nx = b.xf + dx;
+      const ny = b.yf + dy;
+      if (!w.map.isPassable(Math.floor(nx), Math.floor(ny))) continue;
+      const d = Math.hypot(nx - tcx, ny - tcy);
+      if (d < bd) {
+        bd = d;
+        bdx = dx;
+        bdy = dy;
+      }
+    }
+    b.xf += bdx * stats.speed * sec;
+    b.yf += bdy * stats.speed * sec;
+    e.x = Math.floor(b.xf);
+    e.y = Math.floor(b.yf);
     return;
   }
 
@@ -426,6 +460,22 @@ function updateBro(w: World, e: Entity, dtMs: number): void {
       score += 0.02 / (1 + Math.abs(hqCx - nx) + Math.abs(hqCy - ny));
     }
     if (score > best.score) best = { dx, dy, score };
+  }
+  // Anti-stall: on a flat local maximum, take a random passable step.
+  if (best.dx === 0 && best.dy === 0) {
+    const dirs = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const;
+    for (let tries = 0; tries < 8; tries++) {
+      const [dx, dy] = dirs[w.rng.int(0, 3)]!;
+      if (w.map.isPassable(Math.floor(b.xf + dx), Math.floor(b.yf + dy))) {
+        best = { dx, dy, score: best.score };
+        break;
+      }
+    }
   }
   b.xf += best.dx * stats.speed * sec;
   b.yf += best.dy * stats.speed * sec;

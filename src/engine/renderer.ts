@@ -79,7 +79,7 @@ export function drawImpact(ctx: CanvasRenderingContext2D, world: World, camera: 
       const x = (cx * IMPACT_CELL * TILE_SIZE - camera.x) * camera.zoom;
       const y = (cy * IMPACT_CELL * TILE_SIZE - camera.y) * camera.zoom;
       const s = IMPACT_CELL * TILE_SIZE * camera.zoom;
-      ctx.fillStyle = `rgba(251,113,133,${Math.min(0.28, val * 0.02)})`;
+      ctx.fillStyle = `rgba(251,113,133,${Math.min(0.3, val * 0.06)})`;
       ctx.fillRect(x, y, s, s);
     }
   }

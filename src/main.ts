@@ -184,6 +184,13 @@ function renderFrame(dt: number): void {
     overlay.classList.add("show");
     const title = document.querySelector<HTMLElement>("#overlay-title")!;
     const sub = document.querySelector<HTMLElement>("#overlay-sub")!;
+    if (world.state === "won") {
+      title.textContent = "IPO COMPLETE — YOU'RE THE FUND";
+      sub.textContent = `Hired ${world.hired}/${HIRE_QUOTA} · Alpha ${world.totals.alpha} · Run ${Math.floor(world.timeMs / 60_000)}m`;
+    } else {
+      title.textContent = "MARGIN CALL — FUND LIQUIDATED";
+      sub.textContent = "The bros won. Print briefs, defend the HQ, hire faster.";
+    }
     title.classList.toggle("lost", world.state === "lost");
   }
 }

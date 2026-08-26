@@ -76,9 +76,9 @@ describe("finance bros", () => {
     const w = makeWorld();
     const f = w.feeds[0]!;
     const m = w.placeEntity("miner", f.x, f.y)!;
-    powerNear(w, f.x, f.y);
     m.hp = 5;
     m.maxHp = 5;
+    powerNear(w, f.x, f.y);
     spawnBro(w, "analyst", f.x + 2, f.y); // 2 dmg/s → 5hp in ~3s
     tick(w, 6);
     expect(w.entities.has(m.id)).toBe(false);
@@ -101,6 +101,20 @@ describe("finance bros", () => {
     spawnBro(w, "trader", hq.x + 2, hq.y + 2); // 6 dmg/s
     tick(w, 4);
     expect(w.state).toBe("lost");
+  });
+
+  it("bros chase machines through the impact blob instead of stalling", () => {
+    // Regression: greedy impact-maximizing stalled bros at the blob's local
+    // maximum one tile from a machine; they must now pursue and chew it.
+    const w = makeWorld();
+    const f = w.feeds[0]!;
+    const m = w.placeEntity("miner", f.x, f.y)!;
+    m.hp = 10;
+    m.maxHp = 10;
+    powerNear(w, f.x, f.y);
+    spawnBro(w, "analyst", f.x + 4, f.y); // just outside chase range (10)
+    tick(w, 20); // ample time to approach + chew
+    expect(w.entities.has(m.id)).toBe(false);
   });
 });
 
