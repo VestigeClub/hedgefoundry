@@ -1,6 +1,6 @@
 /**
  * Boot: engine loop + camera + input + tile renderer + world sim + market
- * feed + build UI. DESIGN.md M1–M6.
+ * feed + build UI + sound. DESIGN.md M1–M6.
  */
 import "./style.css";
 import { Camera } from "./engine/camera";
@@ -18,6 +18,7 @@ import { Hud } from "./ui/hud";
 import { Panel } from "./ui/panel";
 import { BuildController } from "./ui/build";
 import { ResearchPanel } from "./ui/research";
+import { Sound } from "./ui/sound";
 import type { TileMap } from "./world/tilemap";
 import type { FeedPatch } from "./world/mapgen";
 
@@ -104,13 +105,25 @@ const build = new BuildController(
     toast: (msg) => {
       toastEl.textContent = msg;
       toastEl.classList.add("show");
-            clearTimeout(toastTimer ?? undefined);
+      clearTimeout(toastTimer ?? undefined);
       toastTimer = window.setTimeout(() => toastEl.classList.remove("show"), 1600);
     },
   },
   document.querySelector<HTMLElement>("#buildbar")!,
 );
 const research = new ResearchPanel(document.querySelector<HTMLElement>("#research")!, world);
+const sound = new Sound();
+addEventListener("pointerdown", () => sound.unlock());
+addEventListener("keydown", () => sound.unlock());
+
+// M6: audio events via per-frame deltas (sim stays pure).
+let lastTotals = { ...world.totals };
+let lastBroCount = 0;
+let lastHired = 0;
+let lastTowerAmmo = 0;
+let lastWarningAt = -Infinity;
+let lastCraftSoundAt = 0;
+let lastState: "playing" | "won" | "lost" = world.state;
 
 // World seed from the relay (realized vol) — consumed by world-gen later.
 fetchWorldSeed(relayBase()).then((ws) => {
@@ -190,6 +203,32 @@ function renderFrame(dt: number): void {
   hud.update(world);
   panel.update();
 
+  // M6: audio events via deltas.
+  {
+    const now = world.timeMs;
+    for (const it of ["clean", "signal", "alpha", "brief"] as const) {
+      if (world.totals[it] > lastTotals[it] && now - lastCraftSoundAt > 120) {
+        sound.craft(it);
+        lastCraftSoundAt = now;
+        break;
+      }
+    }
+    lastTotals = { ...world.totals };
+    const bros = [...world.entities.values()].filter((e) => e.kind === "bro").length;
+    if (bros > lastBroCount) sound.broSpawn();
+    lastBroCount = bros;
+    if (world.hired > lastHired) sound.hire();
+    lastHired = world.hired;
+    let towerAmmo = 0;
+    for (const e of world.entities.values()) if (e.kind === "tower") towerAmmo += e.input?.items.brief ?? 0;
+    if (towerAmmo < lastTowerAmmo) sound.towerShot();
+    lastTowerAmmo = towerAmmo;
+    if (world.capital < world.demandPerSec * 10 && now - lastWarningAt > 10_000) {
+      sound.warning();
+      lastWarningAt = now;
+    }
+  }
+
   // X removes the selected entity.
   if (input.keys.has("KeyX") && panel.hasSelection()) {
     const e = panel.current();
@@ -211,6 +250,11 @@ function renderFrame(dt: number): void {
       sub.textContent = "The bros won. Print briefs, defend the HQ, hire faster.";
     }
     title.classList.toggle("lost", world.state === "lost");
+    if (world.state !== lastState) {
+      if (world.state === "won") sound.win();
+      else sound.lose();
+      lastState = world.state;
+    }
   }
 }
 
