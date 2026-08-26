@@ -27,7 +27,15 @@ import type { FeedPatch } from "./world/mapgen";
 // Dev/verification hook: lets browser automation drive and inspect the sim.
 declare global {
   interface Window {
-    __HF?: { world: World; camera: Camera; map: TileMap; error?: string; demo?: Demo; tick?: (dtMs: number) => void };
+    __HF?: {
+      world: World;
+      camera: Camera;
+      map: TileMap;
+      error?: string;
+      demo?: Demo;
+      tick?: (dtMs: number) => void;
+      frame?: () => void;
+    };
   }
 }
 
@@ -148,6 +156,7 @@ let lastMouse = { x: 0, y: 0 };
 const PAN_SPEED = 700; // CSS px/s at zoom 1
 let lastSaveMs = 0;
 let lastFrameMs = performance.now();
+let prevT = false;
 
 function sizeCanvas(): void {
   const dpr = window.devicePixelRatio || 1;
@@ -214,7 +223,11 @@ function renderFrame(_alpha: number): void {
   }
 
   build.update();
-  if (input.keys.has("KeyT")) research.toggle();
+  // Edge-trigger the research toggle: held KeyT must not flip the panel
+  // ~60×/s (same rising-edge pattern as the build menu keys).
+  const tDown = input.keys.has("KeyT");
+  if (tDown && !prevT) research.toggle();
+  prevT = tDown;
   research.update();
 
   if (demo) {
@@ -319,4 +332,11 @@ document.querySelector<HTMLElement>("#overlay-btn")!.addEventListener("click", (
 addEventListener("beforeunload", () => {
   if (world.state === "playing") saveToStorage(serializeWorld(world, MAP_OPTS));
 });
-window.__HF = { world, camera, map: world.map, demo: demo ?? undefined, tick: (dtMs) => tickWorld(world, dtMs) };
+window.__HF = {
+  world,
+  camera,
+  map: world.map,
+  demo: demo ?? undefined,
+  tick: (dtMs) => tickWorld(world, dtMs),
+  frame: () => renderFrame(0),
+};
