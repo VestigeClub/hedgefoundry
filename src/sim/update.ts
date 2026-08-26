@@ -5,12 +5,9 @@
  * Order: power → demand/multiplier → funding (capital in) → burn (capital
  * out) → miners → machines → belts → traders.
  */
-import type { Dir } from "./world";
-import { DX, DY } from "./world";
-import type { Entity } from "./world";
-import type { World } from "./world";
+import { DX, DY, type Dir, type Entity, type World } from "./world";
 import type { Item } from "./items";
-import { bufferAdd, bufferTake, bufferCount } from "./production";
+import { bufferAdd, bufferCount, bufferTake } from "./production";
 
 export function tickWorld(w: World, dtMs: number): void {
   w.timeMs += dtMs;
@@ -69,10 +66,10 @@ function updateMiner(w: World, e: Entity, dtMs: number): void {
   if (richness <= 0) return; // placed off-patch: idle (shouldn't happen; canPlace guards)
   m.rateAcc += 1 * richness * (dtMs / 1000) * w.multiplier;
   while (m.rateAcc >= 1) {
-        if (bufferAdd(m.output, "tape", 1) === 0) break; // output full; hold the fraction
+    if (bufferAdd(m.output, "tape", 1) === 0) break; // output full; hold the fraction
     m.rateAcc -= 1;
     w.totals.tape += 1;
-    }
+  }
   // Push buffered tape onto adjacent belts; remainder waits for traders.
   while (bufferCount(m.output, "tape") > 0 && pushToAdjacentBelt(w, e, "tape")) {
     bufferTake(m.output, "tape", 1);
@@ -216,7 +213,7 @@ function updateTrader(w: World, e: Entity, dtMs: number): void {
       }
     }
   }
-    if (!item) return;
+  if (!item) return;
   if (!dest) return;
   if (dest.kind === "belt") {
     beltPush(dest, item, 0);
