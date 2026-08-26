@@ -4,12 +4,13 @@
  */
 import type { Camera } from "./camera";
 import { Tile, TileMap, TILE_SIZE } from "../world/tilemap";
-
 export const PALETTE = {
   bg: "#0a0e14",
   grid: "#13202e",
+  panel: "#0f1620",
   pool: "#16222f",
   poolEdge: "#1c2c3d",
+  feed: "#0d2431",
 } as const;
 
 export function drawMap(
@@ -28,15 +29,20 @@ export function drawMap(
   ctx.fillStyle = PALETTE.bg;
   ctx.fillRect(0, 0, viewW, viewH);
 
-  // Obstacles (stale pools): only visible tiles.
-  ctx.fillStyle = PALETTE.pool;
+  // Tiles: data feeds (cyan tint + pulse dot) and stale pools (obstacles).
   for (let ty = ya; ty < yb; ty++) {
     for (let tx = xa; tx < xb; tx++) {
-      if (map.get(tx, ty) !== Tile.StalePool) continue;
+      const t = map.get(tx, ty);
+      if (t !== Tile.StalePool && t !== Tile.Feed) continue;
       const sx = (tx * TILE_SIZE - camera.x) * camera.zoom;
       const sy = (ty * TILE_SIZE - camera.y) * camera.zoom;
       const s = TILE_SIZE * camera.zoom;
+      ctx.fillStyle = t === Tile.Feed ? PALETTE.feed : PALETTE.pool;
       ctx.fillRect(sx, sy, s, s);
+      if (t === Tile.Feed) {
+        ctx.fillStyle = "#0e4a5c";
+        ctx.fillRect(sx + s * 0.3, sy + s * 0.3, s * 0.4, s * 0.4);
+      }
     }
   }
 

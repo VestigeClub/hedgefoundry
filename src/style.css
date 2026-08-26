@@ -114,3 +114,145 @@ body {
 #feed-chip.connecting {
   color: var(--dim);
 }
+
+/* HUD stats strip (top-right, below chips) */
+#hud {
+  position: fixed;
+  top: 62px;
+  right: 8px;
+  max-width: 520px;
+  padding: 4px 8px;
+  border: 1px solid var(--grid);
+  border-radius: 3px;
+  background: rgba(10, 14, 20, 0.85);
+  color: var(--text);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-align: right;
+  pointer-events: none;
+  z-index: 10;
+}
+
+/* Entity inspector */
+#panel {
+  position: fixed;
+  top: 100px;
+  right: 8px;
+  width: 240px;
+  padding: 10px 12px;
+  border: 1px solid var(--grid);
+  border-radius: 4px;
+  background: rgba(15, 22, 32, 0.95);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.5;
+  display: none;
+  z-index: 10;
+}
+
+#panel.open {
+  display: block;
+}
+
+.p-title {
+  color: var(--cyan);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--grid);
+  padding-bottom: 4px;
+}
+
+.p-id {
+  color: var(--dim);
+  font-weight: 400;
+}
+
+.p-row .up {
+  color: var(--up);
+}
+
+.p-row .down {
+  color: var(--down);
+}
+
+.p-row.dim {
+  color: var(--dim);
+  margin-top: 6px;
+  border-top: 1px solid var(--grid);
+  padding-top: 4px;
+}
+
+/* Build bar */
+#buildbar {
+  position: fixed;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--grid);
+  border-radius: 6px;
+  background: rgba(10, 14, 20, 0.9);
+  z-index: 10;
+}
+
+.build-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 64px;
+  padding: 5px 8px;
+  border: 1px solid var(--grid);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.build-btn .key {
+  color: var(--dim);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+}
+
+.build-btn .cost {
+  color: var(--dim);
+  font-size: 9px;
+}
+
+.build-btn:hover {
+  border-color: var(--cyan);
+}
+
+.build-btn.active {
+  border-color: var(--up);
+  color: var(--up);
+}
+
+/* Toast */
+#toast {
+  position: fixed;
+  bottom: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border-radius: 4px;
+  background: rgba(255, 59, 92, 0.15);
+  border: 1px solid var(--down);
+  color: var(--down);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+  z-index: 20;
+}
+
+#toast.show {
+  opacity: 1;
+}

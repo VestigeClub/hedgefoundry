@@ -5,6 +5,7 @@ export const TILE_SIZE = 32;
 export const enum Tile {
   Floor = 0,
   StalePool = 1, // impassable obstacle ("rock" analog)
+  Feed = 2, // data feed patch tile (walkable; miners must be placed on it)
 }
 
 export class TileMap {
@@ -34,6 +35,7 @@ export class TileMap {
 
   /** True if a tile can host a building or be walked by bros. */
   isPassable(x: number, y: number): boolean {
-    return this.get(x, y) === Tile.Floor;
+    const t = this.get(x, y);
+    return t === Tile.Floor || t === Tile.Feed;
   }
 }
