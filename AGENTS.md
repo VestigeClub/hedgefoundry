@@ -6,9 +6,18 @@ data, process signals, assemble strategies, research alpha, survive the
 finance bros, hit the hiring quota, IPO = victory. School assignment — must
 run on Windows, macOS (Zain's MacBook), and in a browser for the professor.
 
-## Decisions
-Stack/engine/palette decided by the design Q&A — recorded in `docs/DESIGN.md`
-and mirrored here once final. Until then: TypeScript, strict, web-first.
+**DECIDED (2026-08-25)**: custom TypeScript engine (Canvas2D, no runtime deps),
+Vite build, Vitest for logic tests. Web-first; runs on Windows/macOS/browser.
+Art: quant terminal dark. See `docs/DESIGN.md` — it is the contract for every
+system; theme mapping §4 is law.
+
+## Commands
+- `npm run dev` — dev server (localhost:5173)
+- `npm run check` — full gate: typecheck + tests + production build. MUST pass
+  before any merge-worthy state.
+- `npm test` / `npm run typecheck` / `npm run build` — individual steps.
+- `node server/relay.mjs` — market data relay (live upstream feed + sim
+  fallback), wire spec in `docs/DESIGN.md` §6.
 
 ## Repo layout
 - `src/` — game source (engine + systems)

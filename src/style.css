@@ -1,0 +1,50 @@
+/* Quant terminal dark — DESIGN.md §8 */
+:root {
+  --bg: #0a0e14;
+  --panel: #0f1620;
+  --grid: #13202e;
+  --up: #00e68c;
+  --down: #ff3b5c;
+  --amber: #ffb300;
+  --cyan: #00c8ff;
+  --text: #b8c7d9;
+  --dim: #5a6b7f;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  font-family: "JetBrains Mono", "IBM Plex Mono", Consolas, monospace;
+  color: var(--text);
+  user-select: none;
+}
+
+#game {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+  cursor: crosshair;
+}
+
+#title-chip {
+  position: fixed;
+  top: 8px;
+  right: 8px;
+  padding: 3px 8px;
+  border: 1px solid var(--grid);
+  border-radius: 3px;
+  background: rgba(10, 14, 20, 0.85);
+  color: var(--dim);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  pointer-events: none;
+}

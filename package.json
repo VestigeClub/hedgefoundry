@@ -1,0 +1,20 @@
+{
+  "name": "hedgefoundry",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Factorio-style hedge fund factory game. Custom TS engine, web-first.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test && npm run build"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
+  }
+}
