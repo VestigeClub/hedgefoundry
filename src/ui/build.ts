@@ -21,6 +21,8 @@ export const BUILD_ORDER: BuildDef[] = [
   { kind: "link", key: "9", label: "TREASURY LINK" },
   { kind: "belt", key: "0", label: "TICKER TAPE" },
   { kind: "trader", key: "q", label: "TRADER" },
+  { kind: "tower", key: "e", label: "COMPLIANCE TOWER" },
+  { kind: "roadshow", key: "g", label: "ROADSHOW" },
 ];
 
 // Input stores KeyboardEvent.code — map display keys to codes.
@@ -36,6 +38,8 @@ const KEY_TO_KIND = new Map<string, EntityKind>([
   ["Digit9", "link"],
   ["Digit0", "belt"],
   ["KeyQ", "trader"],
+  ["KeyE", "tower"],
+  ["KeyG", "roadshow"],
 ]);
 
 export interface BuildCallbacks {

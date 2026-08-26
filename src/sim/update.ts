@@ -6,13 +6,16 @@
  * out) → miners → machines → belts → traders.
  */
 import { DX, DY, type Dir, type Entity, type World } from "./world";
+import { BRO_STATS, HIRE_QUOTA, IMPACT_CELL, ROADSHOW_ALPHA_NEEDED, burnOf, type BroType } from "./world";
 import type { Item } from "./items";
 import { bufferAdd, bufferCount, bufferTake } from "./production";
 import { TECH_BY_ID, applyTech } from "./research";
 
 export function tickWorld(w: World, dtMs: number): void {
+  if (w.state !== "playing") return; // game over: freeze the sim
   w.timeMs += dtMs;
   w.recomputePower();
+  updateImpact(w, dtMs);
 
   // Funding desks produce capital first (consumes fuel).
   for (const e of w.entities.values()) {
@@ -21,6 +24,7 @@ export function tickWorld(w: World, dtMs: number): void {
 
   // Burn: demand scales with the brownout multiplier.
   w.capital = Math.max(0, w.capital - w.demandPerSec * (dtMs / 1000) * w.multiplier);
+  checkMarginCall(w, dtMs);
 
   for (const e of w.entities.values()) {
     switch (e.kind) {
@@ -40,8 +44,16 @@ export function tickWorld(w: World, dtMs: number): void {
       case "trader":
         updateTrader(w, e, dtMs);
         break;
+      case "tower":
+        updateTower(w, e, dtMs);
+        break;
+      case "roadshow":
+        updateRoadshow(w, e, dtMs);
+        break;
     }
   }
+  spawnBros(w, dtMs);
+  updateBros(w, dtMs);
 }
 
 function updateFunding(w: World, e: Entity, dtMs: number): void {
@@ -132,7 +144,8 @@ function machineSpeedMult(w: World, e: Entity): number {
     case "analytics":
       return 1 + 0.25 * w.tech.analyticsSpeed;
     case "factory":
-      return 1 + 0.25 * w.tech.factorySpeed;
+      // +0.5% per hired bro: talent runs the factory (DESIGN.md §5.7).
+      return 1 + 0.25 * w.tech.factorySpeed + 0.005 * w.hired;
     default:
       return 1;
   }
@@ -264,4 +277,216 @@ function updateTrader(w: World, e: Entity, dtMs: number): void {
   }
   t.cooldownMs = 2_000 / (1 + 0.25 * w.tech.traderSpeed);
   t.busyMs = TRADER_SWING_MS;
+}
+
+// ── Market impact (pollution) ────────────────────────────────────────────────
+
+const IMPACT_EMIT_PER_BURN = 0.05; // impact units per burn per second
+const IMPACT_DECAY = 0.98;
+const IMPACT_SPREAD = 0.008;
+
+function updateImpact(w: World, dtMs: number): void {
+  const sec = dtMs / 1000;
+  for (const e of w.entities.values()) {
+    if (!w.powered.has(e.id)) continue;
+    const burn = burnOf(e);
+    if (burn <= 0) continue;
+    const cx = Math.floor((e.x + e.w / 2) / IMPACT_CELL);
+    const cy = Math.floor((e.y + e.h / 2) / IMPACT_CELL);
+    if (cx < 0 || cy < 0 || cx >= w.impactW || cy >= w.impactH) continue;
+    const idx = cy * w.impactW + cx;
+    const added = burn * IMPACT_EMIT_PER_BURN * sec;
+    w.impact[idx] = (w.impact[idx] ?? 0) + added;
+    w.evolution = Math.min(1, w.evolution + added * 5e-5);
+  }
+  // diffuse + decay (new array per tick; 4k floats — fine at 30 Hz)
+  const src = w.impact;
+  const dst = new Float32Array(src.length);
+  for (let cy = 0; cy < w.impactH; cy++) {
+    for (let cx = 0; cx < w.impactW; cx++) {
+      const i = cy * w.impactW + cx;
+      let v = src[i]! * IMPACT_DECAY;
+      if (cx > 0) v += src[i - 1]! * IMPACT_SPREAD;
+      if (cx < w.impactW - 1) v += src[i + 1]! * IMPACT_SPREAD;
+      if (cy > 0) v += src[i - w.impactW]! * IMPACT_SPREAD;
+      if (cy < w.impactH - 1) v += src[i + w.impactW]! * IMPACT_SPREAD;
+      dst[i] = v;
+    }
+  }
+  w.impact = dst;
+}
+
+// ── Finance bros ─────────────────────────────────────────────────────────────
+
+const BRO_CAP_BASE = 40;
+
+function spawnBros(w: World, dtMs: number): void {
+  w.broSpawnTimerMs -= dtMs;
+  if (w.broSpawnTimerMs > 0) return;
+  const broCount = countBros(w);
+  const cap = Math.round(BRO_CAP_BASE * (0.5 + w.evolution));
+  if (broCount >= cap) {
+    w.broSpawnTimerMs = 10_000;
+    return;
+  }
+  const n = Math.min(1 + Math.floor(w.evolution * 6), cap - broCount);
+  for (let i = 0; i < n; i++) {
+    const spot = edgeSpot(w);
+    if (spot) w.spawnBro(broTypeFor(w), spot.x, spot.y);
+  }
+  w.broSpawnTimerMs = Math.max(20_000, 50_000 - w.evolution * 25_000);
+}
+
+function countBros(w: World): number {
+  let n = 0;
+  for (const e of w.entities.values()) if (e.kind === "bro") n++;
+  return n;
+}
+
+function broTypeFor(w: World): BroType {
+  const r = w.rng.float();
+  if (w.evolution > 0.8 && r < 0.15) return "quant";
+  if (w.evolution > 0.4 && r < 0.4) return "md";
+  if (r < 0.75) return "analyst";
+  return "trader";
+}
+
+function edgeSpot(w: World): { x: number; y: number } | null {
+  for (let tries = 0; tries < 20; tries++) {
+    const side = w.rng.int(0, 3);
+    let tx = 0;
+    let ty = 0;
+    if (side === 0) {
+      tx = w.rng.int(2, w.map.w - 3);
+      ty = 2;
+    } else if (side === 1) {
+      tx = w.rng.int(2, w.map.w - 3);
+      ty = w.map.h - 3;
+    } else if (side === 2) {
+      tx = 2;
+      ty = w.rng.int(2, w.map.h - 3);
+    } else {
+      tx = w.map.w - 3;
+      ty = w.rng.int(2, w.map.h - 3);
+    }
+    if (w.map.isPassable(tx, ty)) return { x: tx, y: ty };
+  }
+  return null;
+}
+
+function updateBros(w: World, dtMs: number): void {
+  for (const e of [...w.entities.values()]) {
+    if (e.kind === "bro") updateBro(w, e, dtMs);
+  }
+}
+
+function updateBro(w: World, e: Entity, dtMs: number): void {
+  const b = e.bro!;
+  const stats = BRO_STATS[b.type];
+  const sec = dtMs / 1000;
+
+  // Attack the nearest combat entity if adjacent.
+  let target: Entity | null = null;
+  let bestD = Infinity;
+  for (const other of w.entities.values()) {
+    if (other.id === e.id || other.hp === undefined) continue;
+    const d = distTiles(e, other);
+    if (d < bestD) {
+      bestD = d;
+      target = other;
+    }
+  }
+  if (target && bestD <= 1.7) {
+    b.atkCdMs -= dtMs;
+    if (b.atkCdMs <= 0) {
+      w.damageEntity(target.id, stats.dmg);
+      b.atkCdMs = 1_000;
+    }
+    return;
+  }
+
+  // Move: greedy toward the strongest nearby impact cell, with a gravity
+  // term toward the HQ so early bros always march somewhere.
+  let best = { dx: 0, dy: 0, score: w.impactAt(Math.floor(b.xf), Math.floor(b.yf)) };
+  const hq = w.entities.get(w.hqId);
+  for (const [dx, dy] of [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ] as const) {
+    const nx = Math.floor((b.xf + dx * IMPACT_CELL * 0.9) / IMPACT_CELL);
+    const ny = Math.floor((b.yf + dy * IMPACT_CELL * 0.9) / IMPACT_CELL);
+    if (nx < 0 || ny < 0 || nx >= w.impactW || ny >= w.impactH) continue;
+    if (!w.map.isPassable(Math.floor(b.xf + dx * 1.5), Math.floor(b.yf + dy * 1.5))) continue;
+    let score = w.impact[ny * w.impactW + nx] ?? 0;
+    if (hq) {
+      const hqCx = Math.floor((hq.x + hq.w / 2) / IMPACT_CELL);
+      const hqCy = Math.floor((hq.y + hq.h / 2) / IMPACT_CELL);
+      score += 0.02 / (1 + Math.abs(hqCx - nx) + Math.abs(hqCy - ny));
+    }
+    if (score > best.score) best = { dx, dy, score };
+  }
+  b.xf += best.dx * stats.speed * sec;
+  b.yf += best.dy * stats.speed * sec;
+  e.x = Math.floor(b.xf);
+  e.y = Math.floor(b.yf);
+}
+
+function distTiles(a: Entity, b: Entity): number {
+  const ax = a.x + a.w / 2;
+  const ay = a.y + a.h / 2;
+  const bx = b.x + b.w / 2;
+  const by = b.y + b.h / 2;
+  return Math.hypot(ax - bx, ay - by);
+}
+
+// ── Defense, roadshow, defeat ────────────────────────────────────────────────
+
+function updateTower(w: World, e: Entity, dtMs: number): void {
+  if (!w.powered.has(e.id)) return;
+  const t = e.tower!;
+  t.atkCdMs -= dtMs;
+  if (t.atkCdMs > 0) return;
+  if (bufferCount(e.input!, "brief") <= 0) return;
+  const range = 12 + w.tech.towerRange * 4;
+  let target: Entity | null = null;
+  let bestD = Infinity;
+  for (const b of w.entities.values()) {
+    if (b.kind !== "bro") continue;
+    const d = distTiles(e, b);
+    if (d <= range && d < bestD) {
+      bestD = d;
+      target = b;
+    }
+  }
+  if (!target) return;
+  bufferTake(e.input!, "brief", 1);
+  w.damageEntity(target.id, 8 + w.tech.towerDamage * 8);
+  t.atkCdMs = 500;
+}
+
+function updateRoadshow(w: World, e: Entity, dtMs: number): void {
+  if (!w.powered.has(e.id)) return;
+  if (w.hired < HIRE_QUOTA) return;
+  const r = e.roadshow!;
+  const before = Math.floor(r.progress);
+  r.progress += (4 * dtMs) / 1000; // 4 alpha/s delivery rate
+  if (Math.floor(r.progress) > before) {
+    if (bufferCount(e.input!, "alpha") <= 0) {
+      r.progress = before; // no fuel: hold progress
+      return;
+    }
+    bufferTake(e.input!, "alpha", 1);
+  }
+  if (r.progress >= ROADSHOW_ALPHA_NEEDED) w.state = "won";
+}
+
+function checkMarginCall(w: World, dtMs: number): void {
+  if (w.capital <= 0) {
+    w.marginCallMs += dtMs;
+    if (w.marginCallMs >= 10_000) w.state = "lost";
+  } else {
+    w.marginCallMs = 0;
+  }
 }

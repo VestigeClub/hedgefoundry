@@ -14,10 +14,14 @@ const KIND_COLOR: Record<string, string> = {
   research: "#94a3b8",
   funding: "#10b981",
   vault: "#2dd4bf",
-  link: "#3b4a5c",
-  belt: "#16222f",
-  trader: "#e2e8f0",
-};
+     link: "#3b4a5c",
+   belt: "#16222f",
+   trader: "#e2e8f0",
+   tower: "#fb7185",
+   hq: "#38bdf8",
+   roadshow: "#fbbf24",
+   bro: "#f472b6",
+ };
 
 const KIND_GLYPH: Record<string, string> = {
   miner: "M",
@@ -29,8 +33,26 @@ const KIND_GLYPH: Record<string, string> = {
   funding: "FD",
   vault: "TV",
   link: "",
-  belt: "",
-  trader: "TR",
+     belt: "",
+   trader: "TR",
+   tower: "CT",
+   hq: "HQ",
+   roadshow: "IPO",
+   bro: "",
+ };
+
+const BRO_COLOR: Record<string, string> = {
+  analyst: "#f472b6",
+  trader: "#fbbf24",
+  md: "#fb7185",
+  quant: "#a78bfa",
+};
+
+const BRO_GLYPH: Record<string, string> = {
+  analyst: "A",
+  trader: "T",
+  md: "M",
+  quant: "Q",
 };
 
 interface Screen {
@@ -64,6 +86,10 @@ function drawEntity(s: Screen, e: Entity, powered: boolean, timeMs: number): voi
   }
   if (e.kind === "link") {
     drawLink(s, e);
+    return;
+    }
+  if (e.kind === "bro") {
+    drawBro(s, e);
     return;
   }
   const { ctx } = s;
@@ -108,10 +134,48 @@ function drawEntity(s: Screen, e: Entity, powered: boolean, timeMs: number): voi
   if (outBuf) drawBufferPips(s, outBuf.items, x + 4, y + h - 10, w - 8, 5);
 
   // power dot
-  ctx.fillStyle = powered ? "#00e68c" : "#5a6b7f";
+    if (e.kind !== "hq" && e.kind !== "roadshow" && e.kind !== "tower") {
+    ctx.fillStyle = powered ? "#00e68c" : "#5a6b7f";
+    ctx.beginPath();
+    ctx.arc(x + w - 5, y + 5, Math.max(2, 3 * s.cam.zoom), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // hp bar (combat entities)
+  if (e.hp !== undefined && e.hp < e.maxHp!) {
+    const bw = w - 8;
+    ctx.fillStyle = "#1c2c3d";
+    ctx.fillRect(x + 4, y + h - 9, bw, 3);
+    ctx.fillStyle = e.hp / e.maxHp! > 0.35 ? "#00e68c" : "#fb7185";
+    ctx.fillRect(x + 4, y + h - 9, bw * (e.hp / e.maxHp!), 3);
+  }
+}
+
+function drawBro(s: Screen, e: Entity): void {
+  const { ctx } = s;
+  const b = e.bro!;
+  const color = BRO_COLOR[b.type]!;
+  const x = sx(s, b.xf * TILE_SIZE);
+  const y = sy(s, b.yf * TILE_SIZE);
+  const r = Math.max(4, sz(s, 0.35));
+  ctx.fillStyle = PALETTE.panel;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1, s.cam.zoom);
   ctx.beginPath();
-  ctx.arc(x + w - 5, y + 5, Math.max(2, 3 * s.cam.zoom), 0, Math.PI * 2);
+  ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = color;
+  ctx.font = `${Math.max(8, Math.floor(r * 0.8))}px monospace`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(BRO_GLYPH[b.type]!, x, y + 1);
+  // hp bar
+  const bw = r * 2;
+  ctx.fillStyle = "#1c2c3d";
+  ctx.fillRect(x - r, y + r + 2, bw, 3);
+  ctx.fillStyle = e.hp! / e.maxHp! > 0.35 ? "#00e68c" : "#fb7185";
+  ctx.fillRect(x - r, y + r + 2, bw * (e.hp! / e.maxHp!), 3);
 }
 
 function drawBufferPips(

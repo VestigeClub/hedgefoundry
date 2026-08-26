@@ -5,6 +5,7 @@
  * moves on. Effects are flat level increments in World.tech.
  */
 import type { World } from "./world";
+import { RECIPES } from "./recipes";
 
 export interface TechState {
   minerSpeed: number;
@@ -16,6 +17,10 @@ export interface TechState {
   traderSpeed: number;
   fuelTier: number;
   vaultCapLvl: number;
+  towerRange: number;
+  towerDamage: number;
+  compDiscount: number;
+  briefEfficiency: number;
 }
 
 export const DEFAULT_TECH: TechState = {
@@ -28,6 +33,10 @@ export const DEFAULT_TECH: TechState = {
   traderSpeed: 0,
   fuelTier: 0,
   vaultCapLvl: 0,
+  towerRange: 0,
+  towerDamage: 0,
+  compDiscount: 0,
+  briefEfficiency: 0,
 };
 
 export interface TechDef {
@@ -53,6 +62,12 @@ export const TECHS: TechDef[] = [
   { id: "factory-speed-1", label: "FACTORY SPEED I", desc: "Factories +25%", cost: 12, effect: { factorySpeed: 1 } },
   { id: "vault-cap-2", label: "VAULT CAPACITY II", desc: "+100K reserve", cost: 14, requires: ["vault-cap-1"], effect: { vaultCapLvl: 2 } },
   { id: "fuel-tier-2", label: "FUEL TIER II", desc: "Funding burns ALPHA · 600 CAP/s", cost: 18, requires: ["fuel-tier-1"], effect: { fuelTier: 2 } },
+  { id: "tower-range-1", label: "COMPLIANCE RANGE I", desc: "Towers +4 tiles", cost: 9, effect: { towerRange: 1 } },
+  { id: "tower-damage-1", label: "TOWER DAMAGE I", desc: "Towers +8 dmg", cost: 10, effect: { towerDamage: 1 } },
+  { id: "tower-damage-2", label: "TOWER DAMAGE II", desc: "Towers +16 dmg", cost: 14, requires: ["tower-damage-1"], effect: { towerDamage: 2 } },
+  { id: "comp-discount-1", label: "COMP DISCOUNT I", desc: "Hire comp −15%", cost: 8, effect: { compDiscount: 1 } },
+  { id: "comp-discount-2", label: "COMP DISCOUNT II", desc: "Hire comp −30%", cost: 12, requires: ["comp-discount-1"], effect: { compDiscount: 2 } },
+  { id: "brief-efficiency", label: "BRIEF EFFICIENCY", desc: "Legal Printers make 3", cost: 10, effect: { briefEfficiency: 1 } },
 ];
 
 export const TECH_BY_ID = new Map(TECHS.map((t) => [t.id, t]));
@@ -65,6 +80,10 @@ export function applyTech(w: World, id: string): void {
   for (const [key, value] of Object.entries(t.effect)) {
     const k = key as keyof TechState;
     w.tech[k] = Math.max(w.tech[k], value ?? 0);
+  }
+  if (id === "brief-efficiency" && RECIPES.brief) {
+    // Printer recipe output 2 → 3 per craft.
+    RECIPES.brief.out.brief = 3;
   }
   w.researched.add(id);
 }

@@ -162,15 +162,19 @@ desk moves on. Desk idles without a target. Current tree (12 techs):
   it's fought by towers. **Hired bros leave the raid, count toward the IPO
   quota, and each gives +0.5% alpha output globally** (they run the factory).
   Comp scales with type + evolution.
-- **Compliance Towers** (2×2): fire Legal Briefs (1/s base, range 12, damage
-  8). Need ammo from Legal Printers + belts. Bro death = brief consumed
+- **Compliance Towers** (2×2): fire Legal Briefs (2/s, range 12, damage 8).
+  Need ammo from Legal Printers + belts. Bro death = brief consumed
   (no drops).
+- Defense techs (M5): Compliance Range I (+4 tiles), Tower Damage I/II
+  (+8/+16), Brief Efficiency (printers output 3).
+- Hiring techs (M5): Comp Discount I/II (−15%/−30% hire comp).
 
 ### 5.8 Victory — the IPO
 - **Roadshow** (4×4, the rocket silo): consumes Alpha (1/s) + requires hired
-  quota reached (e.g. 250 bros). Build cost: large.
+  quota reached (250 bros). Build cost: $2M.
 - Quota check: top-bar progress `BROS HIRED 137/250`.
-- When Roadshow delivers its Alpha requirement (e.g. 2,000), **IPO launch**
+- When Roadshow delivers its Alpha requirement (400, at 4/s ≈ 100 s of
+  sustained delivery), **IPO launch**
   sequence plays (countdown, ticker frenzy, confetti of green candles) →
   victory screen + **end-game report** (§9).
 

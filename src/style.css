@@ -349,3 +349,75 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Game-over overlay (DESIGN.md §5.9) */
+#overlay {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 9, 13, 0.82);
+  z-index: 100;
+}
+
+#overlay.show {
+  display: flex;
+}
+
+#overlay-box {
+  text-align: center;
+  border: 1px solid var(--grid);
+  background: var(--panel);
+  padding: 48px 64px;
+  box-shadow: 0 0 40px rgba(0, 200, 255, 0.12);
+}
+
+#overlay-title {
+  font-size: 26px;
+  letter-spacing: 0.12em;
+  color: var(--up);
+  margin-bottom: 12px;
+}
+
+#overlay-title.lost {
+  color: var(--down);
+}
+
+#overlay-sub {
+  color: var(--dim);
+  margin-bottom: 28px;
+  font-size: 13px;
+}
+
+#overlay-btn {
+  background: transparent;
+  border: 1px solid var(--cyan);
+  color: var(--cyan);
+  font: inherit;
+  font-size: 13px;
+  letter-spacing: 0.15em;
+  padding: 10px 28px;
+  cursor: pointer;
+}
+
+#overlay-btn:hover {
+  background: rgba(0, 200, 255, 0.1);
+}
+
+.hire-btn {
+  width: 100%;
+  margin-top: 8px;
+  background: transparent;
+  border: 1px solid var(--up);
+  color: var(--up);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  padding: 8px 0;
+  cursor: pointer;
+}
+
+.hire-btn:hover {
+  background: rgba(0, 230, 140, 0.1);
+}

@@ -4,6 +4,8 @@
  */
 import type { Camera } from "./camera";
 import { Tile, TileMap, TILE_SIZE } from "../world/tilemap";
+import { IMPACT_CELL } from "../sim/world";
+import type { World } from "../sim/world";
 export const PALETTE = {
   bg: "#0a0e14",
   grid: "#13202e",
@@ -61,4 +63,24 @@ export function drawMap(
     ctx.lineTo(viewW, sy + 0.5);
   }
   ctx.stroke();
+}
+
+/** Faint red wash over high-impact cells (pollution analog, DESIGN.md §5.7). */
+export function drawImpact(ctx: CanvasRenderingContext2D, world: World, camera: Camera): void {
+  const v = camera.visibleTiles(TILE_SIZE);
+  const cx0 = Math.max(0, Math.floor(v.x0 / IMPACT_CELL));
+  const cy0 = Math.max(0, Math.floor(v.y0 / IMPACT_CELL));
+  const cx1 = Math.min(world.impactW - 1, Math.ceil(v.x1 / IMPACT_CELL));
+  const cy1 = Math.min(world.impactH - 1, Math.ceil(v.y1 / IMPACT_CELL));
+  for (let cy = cy0; cy <= cy1; cy++) {
+    for (let cx = cx0; cx <= cx1; cx++) {
+      const val = world.impact[cy * world.impactW + cx] ?? 0;
+      if (val < 0.05) continue;
+      const x = (cx * IMPACT_CELL * TILE_SIZE - camera.x) * camera.zoom;
+      const y = (cy * IMPACT_CELL * TILE_SIZE - camera.y) * camera.zoom;
+      const s = IMPACT_CELL * TILE_SIZE * camera.zoom;
+      ctx.fillStyle = `rgba(251,113,133,${Math.min(0.28, val * 0.02)})`;
+      ctx.fillRect(x, y, s, s);
+    }
+  }
 }

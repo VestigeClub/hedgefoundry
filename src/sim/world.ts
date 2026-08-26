@@ -24,7 +24,20 @@ export type EntityKind =
   | "vault"
   | "link"
   | "belt"
-  | "trader";
+  | "trader"
+  | "tower"
+  | "hq"
+  | "roadshow"
+  | "bro";
+
+export type BroType = "analyst" | "trader" | "md" | "quant";
+
+export const BRO_STATS: Record<BroType, { hp: number; dmg: number; speed: number; comp: number; label: string }> = {
+  analyst: { hp: 20, dmg: 2, speed: 1.6, comp: 20_000, label: "ANALYST" },
+  trader: { hp: 60, dmg: 6, speed: 1.1, comp: 60_000, label: "TRADER" },
+  md: { hp: 200, dmg: 15, speed: 0.7, comp: 180_000, label: "MANAGING DIRECTOR" },
+  quant: { hp: 400, dmg: 25, speed: 0.5, comp: 500_000, label: "QUANT" },
+};
 
 export interface BeltItem {
   item: Item;
@@ -46,6 +59,14 @@ export interface Entity {
   funding?: { input: Buffer; fuelAcc: number };
   belt?: { dir: Dir; speed: number; items: BeltItem[] };
   trader?: { dir: Dir; cooldownMs: number; busyMs: number };
+  /** Generic input buffer (tower ammo, roadshow alpha). */
+  input?: Buffer;
+  /** Combat hit points (machines, towers, HQ, roadshow, bros). */
+  hp?: number;
+  maxHp?: number;
+  bro?: { type: BroType; atkCdMs: number; xf: number; yf: number };
+  tower?: { atkCdMs: number };
+  roadshow?: { progress: number };
 }
 
 export const SIZES: Record<EntityKind, number> = {
@@ -60,6 +81,10 @@ export const SIZES: Record<EntityKind, number> = {
   link: 1,
   belt: 1,
   trader: 1,
+  tower: 2,
+  hq: 4,
+  roadshow: 4,
+  bro: 1,
 };
 
 /** Build costs in capital (DESIGN.md §11). */
@@ -75,6 +100,10 @@ export const COSTS: Record<EntityKind, number> = {
   link: 2_000,
   belt: 10_000,
   trader: 15_000,
+  tower: 110_000,
+  hq: 0,
+  roadshow: 2_000_000,
+  bro: 0,
 };
 
 export const KIND_LABEL: Record<EntityKind, string> = {
@@ -89,12 +118,19 @@ export const KIND_LABEL: Record<EntityKind, string> = {
   link: "TREASURY LINK",
   belt: "TICKER TAPE",
   trader: "TRADER",
+  tower: "COMPLIANCE TOWER",
+  hq: "FUND OFFICE",
+  roadshow: "ROADSHOW",
+  bro: "FINANCE BRO",
 };
 
 export const BASE_CAPITAL_CAP = 1_000_000;
 export const VAULT_CAPACITY = 50_000;
 export const POWER_RANGE = 7; // tiles, manhattan (DESIGN.md §5.4)
 export const BROWN_OUT_BUFFER_SEC = 2;
+export const HIRE_QUOTA = 250;
+export const ROADSHOW_ALPHA_NEEDED = 400;
+export const IMPACT_CELL = 4; // tiles per impact cell (64×64 on a 256 map)
 
 export interface WorldOpts {
   map: TileMap;
@@ -120,12 +156,54 @@ export class World {
   researched = new Set<string>();
   researchTarget: string | null = null;
   researchPoints = 0;
+  /** Coarse impact field (pollution analog): IMPACT_CELL² tiles per cell. */
+  impact: Float32Array;
+  impactW: number;
+  impactH: number;
+  evolution = 0;
+  hired = 0;
+  state: "playing" | "won" | "lost" = "playing";
+  marginCallMs = 0;
+  broSpawnTimerMs = 60_000;
+  hqId = -1;
 
   constructor(opts: WorldOpts) {
     this.map = opts.map;
     this.feeds = opts.feeds;
     this.rng = opts.rng ?? new Rng(opts.seed);
     this.capital = opts.startCapital ?? BASE_CAPITAL_CAP;
+    this.impactW = Math.ceil(this.map.w / IMPACT_CELL);
+    this.impactH = Math.ceil(this.map.h / IMPACT_CELL);
+    this.impact = new Float32Array(this.impactW * this.impactH);
+  }
+
+  /** Base HP for a combat entity kind. */
+  baseHp(kind: EntityKind): number {
+    switch (kind) {
+      case "hq":
+        return 500;
+      case "roadshow":
+        return 300;
+      case "tower":
+        return 150;
+      case "bro":
+        return 0;
+      default:
+        return 100;
+    }
+  }
+
+  impactAt(tx: number, ty: number): number {
+    const cx = Math.floor(tx / IMPACT_CELL);
+    const cy = Math.floor(ty / IMPACT_CELL);
+    if (cx < 0 || cy < 0 || cx >= this.impactW || cy >= this.impactH) return 0;
+    return this.impact[cy * this.impactW + cx] ?? 0;
+  }
+
+  totalImpact(): number {
+    let sum = 0;
+    for (let i = 0; i < this.impact.length; i++) sum += this.impact[i]!;
+    return sum;
   }
 
   capitalCapacity(): number {
@@ -200,10 +278,55 @@ export class World {
       case "trader":
         e.trader = { dir: "S", cooldownMs: 0, busyMs: 0 };
         break;
+      case "tower":
+        e.tower = { atkCdMs: 0 };
+        e.input = createBuffer(8);
+        break;
+      case "roadshow":
+        e.roadshow = { progress: 0 };
+        e.input = createBuffer(16);
+        break;
+      case "hq":
+        break;
+    }
+    if (kind !== "belt" && kind !== "link" && kind !== "trader") {
+      e.hp = this.baseHp(kind);
+      e.maxHp = e.hp;
     }
     this.capital -= COSTS[kind];
     this.entities.set(e.id, e);
+    if (kind === "hq") this.hqId = e.id;
     return e;
+  }
+
+  /** Spawn the Fund Office at the map center (start of the game). */
+  spawnHQ(): Entity {
+    const cx = Math.floor(this.map.w / 2) - 2;
+    const cy = Math.floor(this.map.h / 2) - 2;
+    const hq = this.placeEntity("hq", cx, cy)!;
+    return hq;
+  }
+
+  /** Spawn a finance bro at a passable tile (map edge caller). */
+  spawnBro(type: BroType, tx: number, ty: number): Entity | null {
+    if (this.state !== "playing") return null;
+    const stats = BRO_STATS[type];
+    const e: Entity = { id: this.nextId++, kind: "bro", x: tx, y: ty, w: 1, h: 1, hp: stats.hp, maxHp: stats.hp, bro: { type, atkCdMs: 0, xf: tx + 0.5, yf: ty + 0.5 } };
+    this.entities.set(e.id, e);
+    return e;
+  }
+
+  /** Hire a bro: pay comp (discounted by tech), absorb into the fund. */
+  hireBro(id: number): boolean {
+    const e = this.entities.get(id);
+    if (!e || e.kind !== "bro") return false;
+    const stats = BRO_STATS[e.bro!.type];
+    const cost = Math.round(stats.comp * (1 - 0.15 * this.tech.compDiscount));
+    if (this.capital < cost) return false;
+    this.capital -= cost;
+    this.entities.delete(id);
+    this.hired += 1;
+    return true;
   }
 
   removeEntity(id: number): void {
@@ -217,13 +340,26 @@ export class World {
     return null;
   }
 
+  /** Apply damage; removes destroyed entities. Returns true if it died. */
+  damageEntity(id: number, dmg: number): boolean {
+    const e = this.entities.get(id);
+    if (!e || e.hp === undefined) return false;
+    e.hp -= dmg;
+    if (e.hp <= 0) {
+      if (e.kind === "hq") this.state = "lost";
+      this.entities.delete(id);
+      return true;
+    }
+    return false;
+  }
+
   /** Recompute the capital grid + brownout multiplier. */
   recomputePower(): void {
-    const powerList = [];
+    const powerList: Array<{ id: number; kind: "source" | "link" | "consumer"; x: number; y: number; w: number; h: number }> = [];
     for (const e of this.entities.values()) {
       powerList.push({
         id: e.id,
-        kind: e.kind === "vault" || e.kind === "funding" ? ("source" as const) : e.kind === "link" ? ("link" as const) : ("consumer" as const),
+        kind: e.kind === "vault" || e.kind === "funding" ? "source" : e.kind === "link" ? "link" : "consumer",
         x: e.x,
         y: e.y,
         w: e.w,
@@ -273,6 +409,10 @@ export function burnOf(e: Entity): number {
       return 15;
     case "research":
       return 40;
+    case "tower":
+      return 25;
+    case "roadshow":
+      return 100;
     default:
       return 0;
   }

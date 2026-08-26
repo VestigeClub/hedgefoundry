@@ -6,11 +6,11 @@ import "./style.css";
 import { Camera } from "./engine/camera";
 import { Input } from "./engine/input";
 import { Loop } from "./engine/loop";
-import { drawMap } from "./engine/renderer";
+ import { drawMap, drawImpact, PALETTE } from "./engine/renderer";
 import { drawEntities } from "./engine/entity-render";
 import { FeedClient, fetchWorldSeed, relayBase } from "./market/feed";
 import { generateMap } from "./world/mapgen";
-import { World } from "./sim/world";
+import { HIRE_QUOTA, World } from "./sim/world";
 import { tickWorld } from "./sim/update";
 import { Ticker } from "./ui/ticker";
 import { Hud } from "./ui/hud";
@@ -43,6 +43,9 @@ const { map, feeds } = generateMap({
   poolClusters: 40,
 });
 const world = new World({ map, feeds, seed: WORLD_SEED });
+// M5: the Fund Office anchors the map — bros gravitate to it and its death
+// is a loss condition.
+world.spawnHQ();
 
 // Boot camera: center on the feed patch nearest the map center (spawn area),
 // so the player sees where to start building.
@@ -75,7 +78,7 @@ const feed = new FeedClient(relayBase(), WORLD_SEED, {
 });
 
 const hud = new Hud(document.querySelector<HTMLElement>("#hud")!);
-const panel = new Panel(document.querySelector<HTMLElement>("#panel")!);
+const panel = new Panel(document.querySelector<HTMLElement>("#panel")!, world);
 const toastEl = document.querySelector<HTMLElement>("#toast")!;
 let toastTimer: number | null = null;
 
@@ -84,7 +87,7 @@ const build = new BuildController(
   camera,
   input,
   {
-    onSelect: (e) => panel.setSelection(world, e),
+    onSelect: (e) => panel.setSelection(e),
     toast: (msg) => {
       toastEl.textContent = msg;
       toastEl.classList.add("show");
@@ -160,22 +163,33 @@ function renderFrame(dt: number): void {
   if (input.keys.has("KeyT")) research.toggle();
   research.update();
 
-  drawMap(ctx, map, camera);
+   drawMap(ctx, map, camera);
+  drawImpact(ctx, world, camera);
   drawEntities(ctx, world, camera, world.timeMs);
   build.drawGhost(ctx);
 
   hud.update(world);
-  panel.update(world);
+    panel.update();
 
   // X removes the selected entity.
   if (input.keys.has("KeyX") && panel.hasSelection()) {
     const e = panel.current();
     if (e) world.removeEntity(e.id);
-    panel.setSelection(world, null);
+        panel.setSelection(null);
+    }
+
+  // Game over overlay.
+  if (world.state !== "playing") {
+    const overlay = document.querySelector<HTMLElement>("#overlay")!;
+    overlay.classList.add("show");
+    const title = document.querySelector<HTMLElement>("#overlay-title")!;
+    const sub = document.querySelector<HTMLElement>("#overlay-sub")!;
+    title.classList.toggle("lost", world.state === "lost");
   }
 }
 
 addEventListener("resize", sizeCanvas);
 sizeCanvas();
 loop.start();
+document.querySelector<HTMLElement>("#overlay-btn")!.addEventListener("click", () => location.reload());
 window.__HF = { world, camera, map };
