@@ -2,6 +2,8 @@
  * Deterministic seeded PRNG (mulberry32) — the ONLY randomness source in the
  * simulation. Sim state must reproduce exactly from (worldSeed, marketSeed).
  * DESIGN.md §10: determinism is a hard rule; no Math.random in sim paths.
+ *
+ * The internal `a` is exposed so save/load can resume the exact draw stream.
  */
 export function mulberry32(seed: number): () => number {
   let a = seed >>> 0;
@@ -15,20 +17,28 @@ export function mulberry32(seed: number): () => number {
 
 /** Random generator with named helpers, seeded and deterministic. */
 export class Rng {
-  private readonly next: () => number;
+  private a: number;
 
-  constructor(seed: number) {
-    this.next = mulberry32(seed);
+  constructor(seed: number, state?: number) {
+    this.a = state ?? seed >>> 0;
+  }
+
+  /** Opaque internal state — enough to resume the exact draw stream. */
+  state(): number {
+    return this.a;
   }
 
   /** Uniform float in [0, 1). */
   float(): number {
-    return this.next();
+    this.a = (this.a + 0x6d2b79f5) | 0;
+    let t = Math.imul(this.a ^ (this.a >>> 15), 1 | this.a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   }
 
   /** Uniform float in [min, max). */
   range(min: number, max: number): number {
-    return min + this.next() * (max - min);
+    return min + this.float() * (max - min);
   }
 
   /** Uniform integer in [min, max] inclusive. */
@@ -38,7 +48,7 @@ export class Rng {
 
   /** True with probability p. */
   chance(p: number): boolean {
-    return this.next() < p;
+    return this.float() < p;
   }
 
   /** Random element of an array. */

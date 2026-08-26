@@ -1,23 +1,25 @@
 /**
  * Boot: engine loop + camera + input + tile renderer + world sim + market
- * feed + build UI. DESIGN.md M1–M3.
+ * feed + build UI. DESIGN.md M1–M6.
  */
 import "./style.css";
 import { Camera } from "./engine/camera";
 import { Input } from "./engine/input";
 import { Loop } from "./engine/loop";
- import { drawMap, drawImpact, PALETTE } from "./engine/renderer";
+import { drawMap, drawImpact } from "./engine/renderer";
 import { drawEntities } from "./engine/entity-render";
 import { FeedClient, fetchWorldSeed, relayBase } from "./market/feed";
 import { generateMap } from "./world/mapgen";
 import { HIRE_QUOTA, World } from "./sim/world";
 import { tickWorld } from "./sim/update";
+import { serializeWorld, deserializeWorld, saveToStorage, loadFromStorage, clearStorageSave } from "./sim/save";
 import { Ticker } from "./ui/ticker";
 import { Hud } from "./ui/hud";
 import { Panel } from "./ui/panel";
 import { BuildController } from "./ui/build";
 import { ResearchPanel } from "./ui/research";
 import type { TileMap } from "./world/tilemap";
+import type { FeedPatch } from "./world/mapgen";
 
 // Dev/verification hook: lets browser automation drive and inspect the sim.
 declare global {
@@ -32,20 +34,31 @@ const ctx = canvas.getContext("2d")!;
 const WORLD_SEED = 1337;
 const MAP_W = 256;
 const MAP_H = 256;
+const MAP_OPTS = { width: MAP_W, height: MAP_H, seed: WORLD_SEED, startClearRadius: 24, poolClusters: 40 };
 
 const camera = new Camera(innerWidth, innerHeight);
 const input = new Input(canvas);
-const { map, feeds } = generateMap({
-  width: MAP_W,
-  height: MAP_H,
-  seed: WORLD_SEED,
-  startClearRadius: 24,
-  poolClusters: 40,
-});
-const world = new World({ map, feeds, seed: WORLD_SEED });
+const gen = generateMap(MAP_OPTS);
+let world = new World({ map: gen.map, feeds: gen.feeds, seed: WORLD_SEED });
+let feeds: FeedPatch[] = gen.feeds;
+
+// M6: resume an autosave if present; discard corrupt data.
+const saved = loadFromStorage();
+if (saved) {
+  try {
+    const r = deserializeWorld(saved);
+    world = r.world;
+    feeds = r.feeds;
+    console.log("[save] resumed autosave");
+  } catch (err) {
+    console.warn("[save] discarding corrupt save", err);
+    clearStorageSave();
+  }
+}
+
 // M5: the Fund Office anchors the map — bros gravitate to it and its death
 // is a loss condition.
-world.spawnHQ();
+if (!world.entities.has(world.hqId)) world.spawnHQ();
 
 // Boot camera: center on the feed patch nearest the map center (spawn area),
 // so the player sees where to start building.
@@ -91,7 +104,7 @@ const build = new BuildController(
     toast: (msg) => {
       toastEl.textContent = msg;
       toastEl.classList.add("show");
-      if (toastTimer !== null) clearTimeout(toastTimer);
+            clearTimeout(toastTimer ?? undefined);
       toastTimer = window.setTimeout(() => toastEl.classList.remove("show"), 1600);
     },
   },
@@ -106,6 +119,7 @@ fetchWorldSeed(relayBase()).then((ws) => {
 
 let lastMouse = { x: 0, y: 0 };
 const PAN_SPEED = 700; // CSS px/s at zoom 1
+let lastSaveMs = 0;
 
 function sizeCanvas(): void {
   const dpr = window.devicePixelRatio || 1;
@@ -120,6 +134,11 @@ const loop = new Loop({
     try {
       feed.advanceSim(dtMs); // no-op while the relay is live
       tickWorld(world, dtMs);
+      // M6: autosave every 10s of sim time.
+      if (world.timeMs - lastSaveMs >= 10_000) {
+        saveToStorage(serializeWorld(world, MAP_OPTS));
+        lastSaveMs = world.timeMs;
+      }
     } catch (err) {
       const hf = window.__HF;
       if (hf) hf.error = String(err);
@@ -163,20 +182,20 @@ function renderFrame(dt: number): void {
   if (input.keys.has("KeyT")) research.toggle();
   research.update();
 
-   drawMap(ctx, map, camera);
+  drawMap(ctx, world.map, camera);
   drawImpact(ctx, world, camera);
   drawEntities(ctx, world, camera, world.timeMs);
   build.drawGhost(ctx);
 
   hud.update(world);
-    panel.update();
+  panel.update();
 
   // X removes the selected entity.
   if (input.keys.has("KeyX") && panel.hasSelection()) {
     const e = panel.current();
     if (e) world.removeEntity(e.id);
-        panel.setSelection(null);
-    }
+    panel.setSelection(null);
+  }
 
   // Game over overlay.
   if (world.state !== "playing") {
@@ -198,5 +217,11 @@ function renderFrame(dt: number): void {
 addEventListener("resize", sizeCanvas);
 sizeCanvas();
 loop.start();
-document.querySelector<HTMLElement>("#overlay-btn")!.addEventListener("click", () => location.reload());
-window.__HF = { world, camera, map };
+document.querySelector<HTMLElement>("#overlay-btn")!.addEventListener("click", () => {
+  clearStorageSave();
+  location.reload();
+});
+addEventListener("beforeunload", () => {
+  if (world.state === "playing") saveToStorage(serializeWorld(world, MAP_OPTS));
+});
+window.__HF = { world, camera, map: world.map };
