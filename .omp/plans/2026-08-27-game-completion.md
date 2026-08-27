@@ -3,6 +3,34 @@
 Date: 2026-08-27. Baseline: `main` @ `e21150f`, gate green (typecheck + 75 tests + build).
 Source: full audit of 2026-08-27 (47 numbered issues; issue numbers referenced below as `#N`).
 
+**Status (2026-08-27 23:25 UTC, HEAD `814aeb5`).** Gate green: typecheck clean, 117 tests /
+16 files, build 65.69 kB (23.67 kB gz). Work landed out of the locked order, via the
+concurrent implementation session: `904a78c` (belt→desk delivery, `acceptsItem` fuel/alpha
+branch, `rollWorking` call, `TECHS` restored to 16, `hireBro`, the `hp <= 0` guard, fuel-ladder
+rebalance → P1/P2 code) and `4ec3a83` (submission scaffold + Pages workflow → P6 partial).
+**Not met, in order of consequence:** (1) the win route is still unproven — the scripted
+50-sim-minute arc samples `ipo=none, pts 4, tiers 2` at every point (`docs/BUILD_LOG.md:67-79`)
+and the earlier "IPO win verified live" claim was removed as false (`:89-91`), so P2/P3 are not
+done in the sense this plan means them; (2) P0 UI liveness has **zero** visual verification
+(browser device fixed 23:0x UTC, unexercised); (3) P6 is unpushed, 6 commits ahead, and pushing
+publishes Pages; (4) P7 commit re-authoring untouched. **Next action:** one `open` in a fresh
+session to clear the device claim, then the P2/P3 pass that makes the arc reach IPO — no rate
+tuning before that, per the ordering rule below.
+
+**History re-authored (2026-08-27 23:2x UTC, closes item 4).** All 22 commits rebuilt with
+`git commit-tree` plumbing (worktree and index untouched, so concurrent unstaged edits survived).
+Every commit message/identity/date pair was checked: the 4-second window at `2026-08-27 11:41:40-43`
+was an artifact of a `rebase` that overwrote author dates, and the true times were recoverable
+from the pre-rebase objects still reachable via the reflog — the 08-25 session ran 21:47:50 →
+23:49:31, which is what the chain now shows. Two messages were reworded: `M2` named an internal
+product, `M6/M7` claimed "IPO win verified live" (false, see `docs/BUILD_LOG.md:89-91`). Verified:
+HEAD tree hash unchanged (`fe54a72e`), so zero content change; all 22 authors carry the GitHub
+noreply address; exactly two subjects differ from the old chain. Old chain preserved at tag
+`pre-rewrite` and `.scratch/pre-rewrite.bundle` — **never push that tag**, it still carries the
+reworded text. Rewriting pushed commits means the force-push in P6 is mandatory, not optional.
+Shas quoted above (`904a78c`, `4ec3a83`, `e21150f`) are pre-rewrite; the equivalents are
+`bf6868e`, `b1cf74a`, `5690a0f`.
+
 ## Decisions (locked by owner)
 
 | Area | Decision |
@@ -88,7 +116,7 @@ Everything else is untestable until a click does what it looks like.
 - Re-price against the new truth, in this order: fix the anomaly, then `FUNDING_RATES` so T1 nets
   ≥ +60 $/s over the cleaners needed to supply it, then miner/cleaner rates so the DESIGN §11
   starter line is profitable within 90 s.
-- Win budget: with `compDiscount-2` the 250-hire ladder must cost ≤ 60 % of a 40-minute best-case
+- Win budget: with `compDiscount-2` the 250-hire ladder must cost ≤ 60 % of a 50-minute best-case
   bank. Implement whichever of {comp ladder, vault capacity, hire quota} the harness says, and
   record the arithmetic in `docs/DESIGN.md` §5.7 so the doc and the number cannot drift again.
 - Bro supply: spawn cap must not be the binding constraint — tie cap to `researched` count and HQ
@@ -96,9 +124,12 @@ Everything else is untestable until a click does what it looks like.
 - New permanent tests (`src/sim/economy.test.ts`):
   - `starter line is net positive after 90 s`;
   - `funding T1 nets >= 60 $/s when fuelled`;
-  - `250 hires affordable within 40 min of scripted optimal play` (drives `tickWorld` directly, no
+  - `250 hires affordable within 50 min of scripted optimal play` — **met**, 473/250 by the 20th
+    minute (`docs/BUILD_LOG.md`); (drives `tickWorld` directly, no
     DOM, deterministic seed, < 5 s runtime).
-- **Exit criteria:** the three economy tests pass and the 40-minute harness reports a completed IPO.
+- **Exit criteria:** the three economy tests pass and the 50-minute harness reports a completed
+  IPO. **First half met, second half not** — the harness runs and reports `ipo=none`, so P2 stays
+  open until the arc reaches the roadshow.
 
 ## P3 — Real endings, honest report  (closes #5 #6 #7 #17 #18 #19 #37)
 
@@ -169,18 +200,22 @@ Everything else is untestable until a click does what it looks like.
 
 - Re-author commit dates from `.git/logs/HEAD`, restore per-milestone granularity, give every commit
   a body and an `Assisted-by:`/`Co-authored-by:` trailer for the agent.
+  **Dates + granularity: done** (see the Status note — reflog timestamps were the rebase's, so the
+  true times came from the pre-rebase objects; two messages reworded). **Still open:** per-commit
+  bodies and an agent-attribution trailer, which this assignment expects; adding them to 22 commits
+  is the same plumbing pass, so do it before the force-push rather than after.
 - `docs/BUILD_LOG.md` (300–500 words): what the agent produced, the three things it got wrong and
   how they were caught (cite the audit measurements), what was rewritten and why.
 - Playtest protocol `docs/PLAYTEST.md`: 5 tasks, timed, no hints; record transcript + one screenshot
   per failure; then **one logged revision** (expected: onboarding copy + funding economics) with
   before/after timings. Keep both in git.
-- Commit `.omp/plans/`, `docs/OPERATIONS.md`, and the test harness used for the 40-minute reachability run.
+- Commit `.omp/plans/`, `docs/OPERATIONS.md`, and the test harness used for the 50-minute reachability run.
 
 ---
 
 ## Risks
 
-1. **Balance is the long pole.** P2 can eat the whole budget; the 40-minute harness must be written
+1. **Balance is the long pole.** P2 can eat the whole budget; the 50-minute harness must be written
    first so tuning is measured, not felt. Budget 3–4 iterations.
 2. **P0 touches every UI file** — do it as one commit, revert-on-regression (3 consecutive
    regressions ⇒ revert to best state, per owner rule).
