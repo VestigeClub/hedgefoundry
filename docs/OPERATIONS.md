@@ -134,7 +134,7 @@ row counts, world state — over pixels; snapshot the accessibility tree before 
 open one named tab and reuse it. If no browser device is available, **say the claim is
 unproven** and hand the URL to the user. An HTTP 200 is not proof the game runs.
 
-## 8. Harness limits (owner-applied)
+## 8. Context ceiling (owner-directed, agent-applied)
 
 Observed 2026-08-27: ten HTTP 400s against the ruckus lane — *"262144 max context; you
 requested 64000 output and your prompt contains at least 198145 input tokens"* — of which
@@ -143,21 +143,31 @@ completion tokens. `198145 = 262144 − 64000 + 1`, so the margin is one token. 
 `compaction.thresholdPercent: 70` is necessary but not sufficient: compaction is a guess,
 the arithmetic is a law.
 
-Proposed diff, for Zain to apply to `~/.omp/agent/config.yml` (global — affects every
-project on this box; agents must not edit it):
+Applied 2026-08-27 23:05 UTC on the owner's instruction ("GO on A, don't do anything upstream,
+fix it locally"): `compaction.thresholdPercent: 70 → 60`, one line at
+`~/.omp/agent/config.yml:14`, backup `config.yml.bak-20260827-ctx-ceiling` (verified by
+`diff`: `14c14` and nothing else). At 60 % the estimate caps at 157.3k, so
+157.3k + 64k = 221.3k — ~41k under the 262,144 window, and ~26k of clearance above the
+measured +15k tokenizer drift.
 
-```yaml
-compaction:
-  # 70% (183.5k) leaves 78.6k for a 64k completion + tokenizer drift. 60% = 157k,
-  # which makes prompt + max_completion_tokens <= 262144 unconditionally true.
-  thresholdPercent: 60
-```
+Three honest limits on this:
+- A turn's tool output is appended *after* the threshold check, so one oversized dump can
+  still cross the 198,144 floor. §1 and §6 (stop re-reading the same file 118 times, keep
+  files short) are the fix for that, not a smaller number.
+- `maxTokens: 65536` in `models.yml:12,40,63` is deliberately untouched. Halving it buys 32k
+  of headroom but truncates the wholesale rewrites §1 requires (`update.ts` is 615 lines),
+  trading a loud failure for a silent one. Splitting those files is what makes a lower output
+  cap affordable.
+- Config binds at session start. The session that produced the 400s (started 16:58 UTC) still
+  holds 70 % in memory until it is restarted.
 
-The durable fix is upstream and belongs to the harness, not this repo: bound the
-completion per request — `max_completion_tokens = min(default, ctx − promptTokens − margin)`
-— and refuse to send above the threshold instead of trusting compaction to shrink in time.
-Lowering the prompt is still the real lever: §6 is what keeps a session away from the
-ceiling, and §2 is what keeps sessions short enough to never approach it.
+Not done, deliberately: the durable fix belongs to the harness — bound the completion per
+request (`max_completion_tokens = min(default, ctx − promptTokens − margin)`) and refuse to
+send above the threshold rather than trusting compaction to shrink in time. The owner scoped
+this to local config, so it is recorded here rather than filed upstream.
+
+Lowering the prompt stays the real lever regardless: §6 keeps a session away from the ceiling,
+and §2 keeps sessions short enough never to approach it.
 
 **Browser device — the real state (verified 2026-08-27).** The device is configured in
 `~/.omp/agent/config.yml`, not a `settings.yml` (no such file exists):
