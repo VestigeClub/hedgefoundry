@@ -61,8 +61,10 @@ boundary, the full gate → commit again.
 - **Never pipe the gate through `grep`/`head`.** Cutting it to four lines hides the
   failure it just printed; the same command was re-run 17 times once. Full output is
   captured and re-readable from the artifact link, so filtering buys nothing.
-- **Never redirect tool output into repo files** (`> out.txt`). Use the artifact link.
-  Seven debug dumps plus a scratch test were left in the tree in one evening.
+- **Never write debug output into tracked paths.** If a file dump is unavoidable it goes to
+  `.scratch/` (git-ignored, git-cleanable), never `out.txt` / `arc.txt` in the repo root —
+  those are re-invented under a new name every session. Prefer the artifact link: tool output
+  is captured and re-readable by range, so a file adds nothing.
 - The scripted-win reachability test is a 50-minute simulated arc and costs ~21 s. Do not
   use it as an inner loop: debug the sub-invariant (one belt→desk delivery, one billing
   tick, one lab's supply/demand ratio) with a millisecond unit probe, and keep the arc for
@@ -149,9 +151,34 @@ completion per request — `max_completion_tokens = min(default, ctx − promptT
 Lowering the prompt is still the real lever: §6 is what keeps a session away from the
 ceiling, and §2 is what keeps sessions short enough to never approach it.
 
-**Browser device.** Two sessions had no browser device and could not honestly verify UI.
-Granting it is Zain's decision in `~/.omp/agent/settings.yml`; agents should state
-"unproven" until it exists.
+**Browser device — the real state (verified 2026-08-27).** The device is configured in
+`~/.omp/agent/config.yml`, not a `settings.yml` (no such file exists):
+
+```yaml
+browser:
+  relay: true      # checked FIRST when a call carries no `app`
+  headless: true   # only reached if relay is off
+```
+
+Because `browser.relay` precedes `browser.headless`, every `open` attaches to Zain's own
+Chrome through the loopback relay. The relay endpoint is up (`127.0.0.1:9224/json/version`
+answers 200, `Chrome/151.0.0.0`), but the sessions that did get the device recorded
+`ERR_ABORTED` on navigation — even a `data:` URL (`docs/BUILD_LOG.md:83-86`) — and in others
+the tool never mounted at all (`Tool xd__browser not found`). **Consequence: no UI claim in
+this repo is visually verified.** Treat the device as unavailable.
+
+Owner options, one line each:
+
+- **Isolated (recommended for this project):** `browser.relay: false` → resolution falls
+  through to `browser.headless: true`, using the Chromium already on disk at
+  `~/.cache/puppeteer/chrome/win64-151.0.7922.77` (verified present). Deterministic, no
+  access to logged-in tabs.
+- **Keep the relay:** run `omp browser-relay install` once and check the extension badge.
+  Powerful, but agents then drive the real browser under his account — named local preview
+  tabs only.
+
+Until one of those is in place and an `open about:blank` succeeds, agents must say
+**"unproven"** and hand over `npm run preview` instead of substituting an HTTP check.
 
 ## 9. Boundaries
 
