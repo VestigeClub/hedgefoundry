@@ -4,7 +4,7 @@
 Factorio-like real-time factory game, reskinned as a hedge fund: mine market
 data, process signals, assemble strategies, research alpha, survive the
 finance bros, hit the hiring quota, IPO = victory. School assignment — must
-run on Windows, macOS (Zain's MacBook), and in a browser for the professor.
+run on Windows, macOS, and in a browser for the professor.
 
 **DECIDED (2026-08-25)**: custom TypeScript engine (Canvas2D, no runtime deps),
 Vite build, Vitest for logic tests. Web-first; runs on Windows/macOS/browser.

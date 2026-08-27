@@ -5,7 +5,7 @@ process signals, assemble trading strategies, defend against finance bros,
 and hit your hiring quota to IPO.
 
 Status: **M1–M7 shipped.** TypeScript strict + Vite + Vitest, gate
-`npm run check` green (75 tests). Full design in `docs/DESIGN.md`.
+`npm run check` green (117 tests). Full design in `docs/DESIGN.md`.
 
 ## Play
 
@@ -17,13 +17,15 @@ node server/relay.mjs   # live market relay → serves the built game on :7891
 ```
 
 - **Live market data**: the relay streams real BTC/ETH/SOL marks + candles
-  (read-only) from a market-data server you configure; without it, the game runs on a
-  deterministic simulated feed (LIVE/SIM chip in the corner).
+  (read-only) from a market-data server you point it at with `DESK_WS` /
+  `DESK_REST` (see `.env.example`); without it the game runs on a deterministic
+  simulated feed (LIVE/SIM chip in the corner). Nothing in the game knows an
+  internal hostname — the upstream is configuration, not code.
 - **Zero install for the professor**: `npm run build && node server/relay.mjs`,
   then open `http://<this-machine-ip>:7891` in any browser.
 - **Cinematic demo**: open `http://localhost:5173/?demo` (or the relay's
-  `:7891/?demo`) — a scripted autoplayer builds the rig, fights off bros,
-  hires 250, and launches the IPO on its own.
+  `:7891/?demo`) — a scripted autoplayer builds the rig, fights off bros and
+  hires toward the quota on its own.
 - **Controls**: `1–0, Q, E, G` build · `R` rotate · `T` research · `X` remove ·
   `WASD`/arrows pan · wheel zoom · middle-drag pan. Click a bro → HIRE.
 - Autosaves every 10s (resume on reload; NEW GAME clears).

@@ -11,10 +11,11 @@ import { RECIPES } from "./recipes";
 import { World, type BeltItem, type BroType, type Dir, type Entity } from "./world";
 import type { Item } from "./items";
 
-const SAVE_KEY = "hedgefoundry-save-v1";
+const SAVE_KEY = "hedgefoundry-save-v2";
 
+/** v2 adds the P3 report stats: loss reason, kills, hires by type, waves, timeline, capital history. */
 interface SaveFormat {
-  v: 1;
+  v: 2;
   map: MapGenOpts;
   world: {
     nextId: number;
@@ -35,6 +36,12 @@ interface SaveFormat {
     broSpawnTimerMs: number;
     hqId: number;
     rngState: number;
+    lossReason: World["lossReason"];
+    brosKilled: number;
+    hiresByType: Record<BroType, number>;
+    waves: number;
+    timeline: World["timeline"];
+    capHistory: World["capHistory"];
   };
   entities: SerializedEntity[];
 }
@@ -52,7 +59,7 @@ interface SerializedEntity {
   input?: SerializedBuffer;
   machine?: { recipeId: string; crafting: boolean; progressMs: number; input: SerializedBuffer; output: SerializedBuffer };
   miner?: { output: SerializedBuffer; rateAcc: number };
-  funding?: { input: SerializedBuffer; fuelAcc: number };
+  funding?: { input: SerializedBuffer; selling: Item | null };
   belt?: { dir: Dir; speed: number; items: BeltItem[] };
   trader?: { dir: Dir; cooldownMs: number; busyMs: number };
   bro?: { type: BroType; atkCdMs: number; xf: number; yf: number };
@@ -86,7 +93,7 @@ function serializeEntity(e: Entity): SerializedEntity {
     };
   }
   if (e.miner) s.miner = { output: serializeBuffer(e.miner.output), rateAcc: e.miner.rateAcc };
-  if (e.funding) s.funding = { input: serializeBuffer(e.funding.input), fuelAcc: e.funding.fuelAcc };
+  if (e.funding) s.funding = { input: serializeBuffer(e.funding.input), selling: e.funding.selling };
   if (e.belt) s.belt = { dir: e.belt.dir, speed: e.belt.speed, items: e.belt.items.map((i) => ({ ...i })) };
   if (e.trader) s.trader = { dir: e.trader.dir, cooldownMs: e.trader.cooldownMs, busyMs: e.trader.busyMs };
   if (e.bro) s.bro = { type: e.bro.type, atkCdMs: e.bro.atkCdMs, xf: e.bro.xf, yf: e.bro.yf };
@@ -116,7 +123,7 @@ function deserializeEntity(s: SerializedEntity): Entity {
     e.machine = { crafter };
   }
   if (s.miner) e.miner = { output: deserializeBuffer(s.miner.output), rateAcc: s.miner.rateAcc };
-  if (s.funding) e.funding = { input: deserializeBuffer(s.funding.input), fuelAcc: s.funding.fuelAcc };
+  if (s.funding) e.funding = { input: deserializeBuffer(s.funding.input), selling: s.funding.selling ?? null };
   if (s.belt) e.belt = { dir: s.belt.dir, speed: s.belt.speed, items: s.belt.items.map((i) => ({ ...i })) };
   if (s.trader) e.trader = { dir: s.trader.dir, cooldownMs: s.trader.cooldownMs, busyMs: s.trader.busyMs };
   if (s.bro) e.bro = { type: s.bro.type, atkCdMs: s.bro.atkCdMs, xf: s.bro.xf, yf: s.bro.yf };
@@ -127,7 +134,7 @@ function deserializeEntity(s: SerializedEntity): Entity {
 
 export function serializeWorld(w: World, mapOpts: MapGenOpts): string {
   const save: SaveFormat = {
-    v: 1,
+    v: 2,
     map: { ...mapOpts },
     world: {
       nextId: w.nextId,
@@ -148,16 +155,28 @@ export function serializeWorld(w: World, mapOpts: MapGenOpts): string {
       broSpawnTimerMs: w.broSpawnTimerMs,
       hqId: w.hqId,
       rngState: w.rng.state(),
+      lossReason: w.lossReason,
+      brosKilled: w.brosKilled,
+      hiresByType: { ...w.hiresByType },
+      waves: w.waves,
+      timeline: w.timeline.map((e) => ({ ...e })),
+      capHistory: w.capHistory.map((p) => ({ ...p })),
     },
     entities: [...w.entities.values()].map(serializeEntity),
   };
   return JSON.stringify(save);
 }
 
+/** Parse + version-gate a save payload. Anything but the current version is refused. */
+function parseSave(json: string): SaveFormat {
+  const save = JSON.parse(json) as SaveFormat;
+  if (save.v !== 2) throw new Error(`save: unsupported version ${save.v}`);
+  return save;
+}
+
 /** Rebuild a world from a serialized save; throws on corrupt/incompatible data. */
 export function deserializeWorld(json: string): { world: World; map: TileMap; feeds: FeedPatch[] } {
-  const save = JSON.parse(json) as SaveFormat;
-  if (save.v !== 1) throw new Error(`save: unsupported version ${save.v}`);
+  const save = parseSave(json);
   const { map, feeds } = generateMap(save.map);
   const w = new World({ map, feeds, seed: save.map.seed, rng: new Rng(save.map.seed, save.world.rngState) });
   w.nextId = save.world.nextId;
@@ -177,6 +196,12 @@ export function deserializeWorld(json: string): { world: World; map: TileMap; fe
   w.marginCallMs = save.world.marginCallMs;
   w.broSpawnTimerMs = save.world.broSpawnTimerMs;
   w.hqId = save.world.hqId;
+  w.lossReason = save.world.lossReason;
+  w.brosKilled = save.world.brosKilled;
+  w.hiresByType = { ...save.world.hiresByType };
+  w.waves = save.world.waves;
+  w.timeline = save.world.timeline.map((e) => ({ ...e }));
+  w.capHistory = save.world.capHistory.map((p) => ({ ...p }));
   for (const s of save.entities) {
     const e = deserializeEntity(s);
     w.entities.set(e.id, e);
@@ -211,6 +236,6 @@ export function clearStorageSave(): void {
 
 /** Tile map regenerated from a save; used by tests/load-time validation. */
 export function mapFromSave(json: string): TileMap {
-  const save = JSON.parse(json) as SaveFormat;
+  const save = parseSave(json);
   return generateMap(save.map).map;
 }

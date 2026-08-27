@@ -19,7 +19,7 @@ import { Panel } from "./ui/panel";
 import { BuildController } from "./ui/build";
 import { ResearchPanel } from "./ui/research";
 import { Sound } from "./ui/sound";
-import { renderReport, type HistoryPoint } from "./ui/report";
+import { renderReport } from "./ui/report";
 import { Demo, demoSpeed } from "./demo/autoplay";
 import type { TileMap } from "./world/tilemap";
 import type { FeedPatch } from "./world/mapgen";
@@ -111,25 +111,52 @@ const panel = new Panel(document.querySelector<HTMLElement>("#panel")!, world);
 const toastEl = document.querySelector<HTMLElement>("#toast")!;
 let toastTimer: number | null = null;
 
+/** Transient banner: build errors, hires, market stress, sim errors. */
+function toast(msg: string): void {
+  toastEl.textContent = msg;
+  toastEl.classList.add("show");
+  clearTimeout(toastTimer ?? undefined);
+  toastTimer = window.setTimeout(() => toastEl.classList.remove("show"), 1600);
+}
+
+const errorChip = document.querySelector<HTMLElement>("#error-chip")!;
+let fatalDone = false;
+
+/**
+ * A throw out of the sim or the renderer used to land in a dev-only global,
+ * which in a served build meant a frozen canvas and no explanation. Stop the
+ * clock — a broken world must not keep autosaving — name the failure on
+ * screen, and keep the console stack for whoever has to fix it.
+ */
+function fatal(where: string, err: unknown): void {
+  const msg = err instanceof Error ? `${err.message}` : String(err);
+  console.error(`[${where}]`, err);
+  if (fatalDone) return;
+  fatalDone = true;
+  loop.stop();
+  errorChip.textContent = `SIM HALTED — ${where.toUpperCase()}: ${msg}`;
+  errorChip.classList.add("show");
+  const hf = window.__HF;
+  if (hf) hf.error = `${where}: ${msg}`;
+}
+
+const sound = new Sound();
+addEventListener("pointerdown", () => sound.unlock());
+addEventListener("keydown", () => sound.unlock());
+
 const build = new BuildController(
   world,
   camera,
   input,
   {
     onSelect: (e) => panel.setSelection(e),
-    toast: (msg) => {
-      toastEl.textContent = msg;
-      toastEl.classList.add("show");
-      clearTimeout(toastTimer ?? undefined);
-      toastTimer = window.setTimeout(() => toastEl.classList.remove("show"), 1600);
-    },
+    onPlace: () => sound.place(),
+    onDeny: () => sound.denied(),
+    toast,
   },
   document.querySelector<HTMLElement>("#buildbar")!,
 );
 const research = new ResearchPanel(document.querySelector<HTMLElement>("#research")!, world);
-const sound = new Sound();
-addEventListener("pointerdown", () => sound.unlock());
-addEventListener("keydown", () => sound.unlock());
 
 // M7: cinematic demo mode (?demo) — scripted autoplay at 4× sim speed.
 const demo = isDemo ? new Demo(world, camera) : null;
@@ -143,9 +170,7 @@ let lastWarningAt = -Infinity;
 let lastCraftSoundAt = 0;
 let lastState: "playing" | "won" | "lost" = world.state;
 
-// M7: capital-arc history for the end-game report (10s samples).
-const capHistory: HistoryPoint[] = [];
-let brosKilled = 0;
+
 
 // World seed from the relay (realized vol) — consumed by world-gen later.
 fetchWorldSeed(relayBase()).then((ws) => {
@@ -157,6 +182,7 @@ const PAN_SPEED = 700; // CSS px/s at zoom 1
 let lastSaveMs = 0;
 let lastFrameMs = performance.now();
 let prevT = false;
+let prevX = false;
 
 function sizeCanvas(): void {
   const dpr = window.devicePixelRatio || 1;
@@ -171,23 +197,22 @@ const loop = new Loop({
     try {
       feed.advanceSim(dtMs); // no-op while the relay is live
       tickWorld(world, dtMs * (demo ? demoSpeed() : 1));
-      // M6: autosave every 10s of sim time.
-      if (world.timeMs - lastSaveMs >= 10_000) {
+      // Autosave every 10 s of sim time (P&L sampling lives in tickWorld).
+      // Time freezes at game over, so this must be state-guarded or it
+      // serializes a finished world every frame.
+      if (world.state === "playing" && world.timeMs - lastSaveMs >= 10_000) {
         saveToStorage(serializeWorld(world, MAP_OPTS));
         lastSaveMs = world.timeMs;
-        capHistory.push({ t: world.timeMs, capital: world.capital, alpha: world.totals.alpha });
       }
     } catch (err) {
-      const hf = window.__HF;
-      if (hf) hf.error = String(err);
+      fatal("tick", err);
     }
   },
   render: (dt) => {
     try {
       renderFrame(dt);
     } catch (err) {
-      const hf = window.__HF;
-      if (hf) hf.error = String(err);
+      fatal("render", err);
     }
   },
 });
@@ -277,7 +302,6 @@ function renderFrame(_alpha: number): void {
     lastTotals = { ...world.totals };
     const bros = [...world.entities.values()].filter((e) => e.kind === "bro").length;
     if (bros > lastBroCount) sound.broSpawn();
-    if (bros < lastBroCount) brosKilled += lastBroCount - bros;
     lastBroCount = bros;
     if (world.hired > lastHired) sound.hire();
     lastHired = world.hired;
@@ -291,12 +315,17 @@ function renderFrame(_alpha: number): void {
     }
   }
 
-  // X removes the selected entity.
-  if (input.keys.has("KeyX") && panel.hasSelection()) {
+  // X demolishes the selection and refunds half (§5.4). Edge-triggered like
+  // every other key: held down, this deleted the whole plant one machine per
+  // frame. The Fund Office is permanent — losing it is the loss condition, so
+  // the refusal says so instead of eating the keypress in silence.
+  const xDown = input.keys.has("KeyX");
+  if (xDown && !prevX && panel.hasSelection()) {
     const e = panel.current();
-    if (e) world.removeEntity(e.id);
+    if (e && !world.removeEntity(e.id)) toast("FUND OFFICE — NOT DEMOLISHABLE");
     panel.setSelection(null);
   }
+  prevX = xDown;
 
   // Game over overlay + end-game report.
   if (world.state !== "playing") {
@@ -305,15 +334,25 @@ function renderFrame(_alpha: number): void {
     const title = document.querySelector<HTMLElement>("#overlay-title")!;
     const sub = document.querySelector<HTMLElement>("#overlay-sub")!;
     const stats = document.querySelector<HTMLElement>("#overlay-stats")!;
+    // Three endings, one per way a run stops (§5.9). A fund that loses its
+    // office was stormed, not liquidated; the advice differs, so the headline
+    // must too.
     if (world.state === "won") {
       title.textContent = "IPO COMPLETE — YOU'RE THE FUND";
       sub.textContent = `Hired ${world.hired}/${HIRE_QUOTA} · Alpha ${world.totals.alpha} · Run ${Math.floor(world.timeMs / 60_000)}m`;
+    } else if (world.lossReason === "hq") {
+      title.textContent = "OFFICE OVERRUN — THE BROS WON";
+      sub.textContent =
+        `Hired ${world.hired}/${HIRE_QUOTA} · Briefs printed ${world.totals.brief} · Run ${Math.floor(world.timeMs / 60_000)}m · ` +
+        "The Fund Office fell. Print briefs and garrison it before you scale the plant.";
     } else {
       title.textContent = "MARGIN CALL — FUND LIQUIDATED";
-      sub.textContent = "The bros won. Print briefs, defend the HQ, hire faster.";
+      sub.textContent =
+        `Hired ${world.hired}/${HIRE_QUOTA} · Burn ${world.demandPerSec.toFixed(0)} $/s · Run ${Math.floor(world.timeMs / 60_000)}m · ` +
+        "Power bills outran sales. Sell a richer fuel, or unpowered idle iron.";
     }
     if (world.state !== lastState) {
-      stats.innerHTML = renderReport(world, { points: capHistory, brosKilled });
+      renderReport(stats, world);
       if (world.state === "won") sound.win();
       else sound.lose();
       lastState = world.state;
@@ -332,11 +371,17 @@ document.querySelector<HTMLElement>("#overlay-btn")!.addEventListener("click", (
 addEventListener("beforeunload", () => {
   if (world.state === "playing") saveToStorage(serializeWorld(world, MAP_OPTS));
 });
-window.__HF = {
-  world,
-  camera,
-  map: world.map,
-  demo: demo ?? undefined,
-  tick: (dtMs) => tickWorld(world, dtMs),
-  frame: () => renderFrame(0),
-};
+// The playtest harness (docs/OPERATIONS.md) drives the game through this
+// handle, so it exists in a dev build or when the page is opened with ?debug.
+// It is a live reference to the running world — handing one to every visitor of
+// the graded site is neither private nor harmless.
+if (import.meta.env.DEV || new URLSearchParams(location.search).has("debug")) {
+  window.__HF = {
+    world,
+    camera,
+    map: world.map,
+    demo: demo ?? undefined,
+    tick: (dtMs) => tickWorld(world, dtMs),
+    frame: () => renderFrame(0),
+  };
+}

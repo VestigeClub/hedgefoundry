@@ -1,10 +1,9 @@
 /**
- * Market frame types — the L1 subset relayed from the desk (DESIGN.md §6).
- * Shapes verified against the wire capture
- * (captured 2026-08-21). Relay passes frames through with an added `src`
- * field ("live" | "sim"); the parser ignores unknown fields.
+ * Market frame types — the L1 subset the relay forwards (DESIGN.md §6).
+ * Field shapes come from the wire capture documented in the DESIGN wire
+ * section, not from a machine-local fixture. Relay passes frames through with
+ * an added `src` field ("live" | "sim"); the parser ignores unknown fields.
  */
-
 export interface CtxFrame {
   ch: "ctx";
   coin: string;

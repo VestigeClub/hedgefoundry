@@ -4,18 +4,18 @@
  * market-data desk. DESIGN.md §6.
  *
  * - One WebSocket client to the desk (broadcast-all; adds zero impact).
- * - Filters to the L1 subset: ctx · candle · cvd · liq. Drops book/bookheat
- *   (L2 depth), whale, brief, fbar, agent, health, watch.
+ * - Filters to the L1 subset: ctx · candle · cvd · liq, game coins only.
+ *   Drops book/bookheat (L2 depth), whale, brief, fbar, agent, health, watch.
  * - Re-serves as SSE to game clients, plus:
  *     /seed   — realized vol from 2 days of 1m BTC candles (world seeding)
  *     /health — relay liveness
  *     /       — serves dist/ statically (LAN demo = one process)
  *
- * Zero deps (Node 24: global WebSocket + fetch). The game client falls back
+ * Zero deps (Node 22+: global WebSocket + fetch). The game client falls back
  * to its embedded SimFeed when this relay is unreachable.
  *
  * Usage: node server/relay.mjs [--port 7891] [--desk ws://desk-host:5299/ws/stream]
- * Env: PORT, DESK_WS, DESK_REST.
+ * Env: PORT, DESK_WS, DESK_REST (see .env.example). Flags beat env.
  */
 import http from "node:http";
 import fs from "node:fs";
@@ -26,11 +26,23 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const DIST = path.join(ROOT, "dist");
 
-const PORT = Number(process.env.PORT ?? 7891);
-const DESK_WS = process.env.DESK_WS ?? "ws://desk-host:5299/ws/stream";
-const DESK_REST = process.env.DESK_REST ?? "http://desk-host:5299";
+/** CLI flag value for `--name value`, or undefined. */
+function flag(name) {
+  const i = process.argv.indexOf(`--${name}`);
+  return i >= 0 ? process.argv[i + 1] : undefined;
+}
+
+const PORT = Number(flag("port") ?? process.env.PORT ?? 7891);
+if (!Number.isInteger(PORT) || PORT < 1 || PORT > 65_535) {
+  console.error(`[relay] bad --port: ${flag("port")}`);
+  process.exit(1);
+}
+// No hardcoded desk endpoint — see .env.example; null = static + SSE only.
+const DESK_WS = flag("desk") ?? process.env.DESK_WS ?? null;
+const DESK_REST = process.env.DESK_REST ?? null;
 
 const KEEP = new Set(["ctx", "candle", "cvd", "liq"]);
+const COINS = new Set(["BTC", "ETH", "SOL"]); // the game's universe; a live desk streams dozens
 const clients = new Set();
 let lastFrameAt = 0;
 
@@ -45,18 +57,39 @@ function push(line) {
   }
 }
 
+// Exponential reconnect: 1s → 2s → 4s → 8s → 15s (capped), reset on open.
+const BACKOFF_STEPS = [1_000, 2_000, 4_000, 8_000, 15_000];
+let backoffIdx = 0;
+function retryDesk() {
+  const delay = BACKOFF_STEPS[Math.min(backoffIdx, BACKOFF_STEPS.length - 1)];
+  backoffIdx++;
+  console.warn(`[relay] desk closed; retrying in ${delay / 1000}s`);
+  setTimeout(connectDesk, delay);
+}
+
 function connectDesk() {
+  if (!DESK_WS) return;
   let ws;
   try {
     ws = new WebSocket(DESK_WS);
   } catch (err) {
     console.error(`[relay] desk connect failed: ${err.message}`);
-    setTimeout(connectDesk, 3000);
+    retryDesk();
     return;
   }
-  ws.onopen = () => console.log(`[relay] the desk connected: ${DESK_WS}`);
+  // A black-holed endpoint never fires open/close; force a close so the
+  // backoff loop keeps trying instead of going permanently deaf.
+  const connectTimer = setTimeout(() => {
+    try {
+      ws.close();
+    } catch {}
+  }, 10_000);
+  ws.onopen = () => {
+    clearTimeout(connectTimer);
+    backoffIdx = 0;
+    console.log(`[relay] desk connected: ${DESK_WS}`);
+  };
   ws.onmessage = (ev) => {
-    lastFrameAt = Date.now();
     let m;
     try {
       m = JSON.parse(String(ev.data));
@@ -64,7 +97,8 @@ function connectDesk() {
       return;
     }
     const f = m && typeof m === "object" ? m : null;
-    if (f && typeof f.ch === "string" && KEEP.has(f.ch)) {
+    if (f && typeof f.ch === "string" && KEEP.has(f.ch) && COINS.has(f.coin)) {
+      lastFrameAt = Date.now();
       push(JSON.stringify({ ...f, src: "live" }));
     }
   };
@@ -74,12 +108,27 @@ function connectDesk() {
     } catch {}
   };
   ws.onclose = () => {
-    console.warn("[relay] the desk closed; reconnecting in 3s");
-    setTimeout(connectDesk, 3000);
+    clearTimeout(connectTimer);
+    retryDesk();
   };
 }
 
+const SEED_TTL_MS = 5 * 60_000;
+const seedCache = { at: 0, p: null };
+
+/** Memoized seed: repeated client fetches must not re-pull days of candles. */
+function cachedSeed() {
+  if (seedCache.p && Date.now() - seedCache.at < SEED_TTL_MS) return seedCache.p;
+  seedCache.at = Date.now();
+  seedCache.p = seedJson().catch((err) => {
+    seedCache.p = null; // failures are not cached; next request retries
+    throw err;
+  });
+  return seedCache.p;
+}
+
 async function seedJson() {
+  if (!DESK_REST) throw new Error("no desk configured (set DESK_REST)");
   const days = 2;
   const end = Date.now();
   const start = end - days * 86_400_000;
@@ -117,6 +166,13 @@ const MIME = {
 };
 
 function serveFile(rel, res) {
+  // README tells readers to start the relay before building; a bare 404 reads
+  // as a routing bug, so name the missing step.
+  if (!fs.existsSync(DIST)) {
+    res.writeHead(503);
+    res.end("run npm run build first");
+    return;
+  }
   const file = path.join(DIST, rel);
   if (!file.startsWith(DIST) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
     res.writeHead(404);
@@ -125,7 +181,7 @@ function serveFile(rel, res) {
   }
   const ext = path.extname(file).toLowerCase();
   res.writeHead(200, { "Content-Type": MIME[ext] ?? "application/octet-stream", "Cache-Control": "no-cache" });
-  fs.createReadStream(file).pipe(res);
+  fs.createReadStream(file).on("error", () => res.destroy()).pipe(res);
 }
 
 const server = http.createServer(async (req, res) => {
@@ -156,7 +212,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   if (u.pathname === "/seed") {
     try {
-      const s = await seedJson();
+      const s = await cachedSeed();
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify(s));
     } catch (err) {
@@ -167,7 +223,9 @@ const server = http.createServer(async (req, res) => {
   }
   if (u.pathname === "/health") {
     res.writeHead(200, { "Content-Type": "application/json" });
-    res.end(JSON.stringify({ ok: true, deskConnected: lastFrameAt > 0, lastFrameMsAgo: lastFrameAt ? Date.now() - lastFrameAt : null, clients: clients.size }));
+    const ago = lastFrameAt ? Date.now() - lastFrameAt : null;
+    // Freshness, not a latch: one old frame must not read as "connected" forever.
+    res.end(JSON.stringify({ ok: true, deskConnected: ago !== null && ago < 10_000, lastFrameMsAgo: ago, clients: clients.size }));
     return;
   }
   if (u.pathname === "/") {
@@ -177,8 +235,14 @@ const server = http.createServer(async (req, res) => {
   serveFile(u.pathname.replace(/^\/+/, ""), res);
 });
 
+server.on("error", (e) => {
+  console.error(`[relay] listen failed: ${e.message}`);
+  process.exit(1);
+});
+
 server.listen(PORT, () => {
   console.log(`[relay] listening http://0.0.0.0:${PORT}`);
   console.log(`[relay] dist ${fs.existsSync(DIST) ? "present" : "ABSENT — run npm run build first"}`);
+  if (!DESK_WS) console.log("[relay] live desk disabled (set DESK_WS)");
 });
 connectDesk();

@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { generateMap } from "../world/mapgen";
 import { tickWorld } from "./update";
-import { World, BRO_STATS, HIRE_QUOTA, type EntityKind } from "./world";
-import { bufferAdd } from "./production";
-import { RECIPES } from "./recipes";
+import { World, BRO_STATS, HIRE_QUOTA, ROADSHOW_ALPHA_NEEDED, type Entity, type EntityKind } from "./world";
+import { bufferAdd, bufferTake } from "./production";
 import { applyTech } from "./research";
 
 const DT = 33.3333;
@@ -25,6 +24,21 @@ function findSpot(w: World, kind: EntityKind, sx: number, sy: number, win = 14):
 function powerNear(w: World, sx: number, sy: number): void {
   const v = findSpot(w, "vault", sx, sy, 2);
   w.placeEntity("vault", v.x, v.y);
+}
+
+/**
+ * Belt lane running south off `m`, pumped to 12 tiles/s so the miner never jams:
+ * at the default 1.5 a belt frees a tail slot only every BELT_SPACING/speed ≈ 5
+ * ticks (~3 tape/s of intake), and a jammed miner stops billing impact (§5.8) —
+ * these tests need a live blob for the bro to sit on.
+ */
+function drainSouth(w: World, m: Entity, tiles: number): void {
+  for (let i = 0; i < tiles; i++) {
+    const b = w.placeEntity("belt", m.x, m.y + m.h + i);
+    if (!b) return;
+    b.belt!.dir = "S";
+    b.belt!.speed = 12;
+  }
 }
 
 function tick(w: World, seconds: number): void {
@@ -72,16 +86,43 @@ describe("finance bros", () => {
     }
   });
 
-  it("bro attacks and destroys an adjacent machine", () => {
+  it("bros never chew field machines — only the office and towers are targets", () => {
+    // BRO_TARGETS = { hq, tower } (update.ts:445): production out in the field is
+    // off the target list, so a bro parked on a working miner cannot damage it.
     const w = makeWorld();
     const f = w.feeds[0]!;
     const m = w.placeEntity("miner", f.x, f.y)!;
     m.hp = 5;
-    m.maxHp = 5;
+    m.maxHp = 5; // soft: one analyst hit (BRO_STATS.analyst.dmg = 2) would kill it
     powerNear(w, f.x, f.y);
-    spawnBro(w, "analyst", f.x + 2, f.y); // 2 dmg/s → 5hp in ~3s
+    drainSouth(w, m, 24);
+    tick(w, 1);
+    expect(w.powered.has(m.id)).toBe(true);
+    expect(w.totalImpact()).toBeGreaterThan(0); // the rig burns → there is a blob to sit on
+    const broId = spawnBro(w, "analyst", f.x + 2, f.y);
     tick(w, 6);
-    expect(w.entities.has(m.id)).toBe(false);
+    // (f.x+2, f.y) is 1.58 tiles from the miner's centre (SIZES.miner = 2) — inside
+    // the 1.7-tile attack range the bro uses for real targets (update.ts:471) — and
+    // it stays parked there for the first ~3.5 s, so this is contact, not reach.
+    expect(w.entities.has(broId)).toBe(true);
+    expect(w.entities.has(m.id)).toBe(true);
+    expect(w.entities.get(m.id)!.hp).toBe(5); // zero damage across the whole visit
+  });
+
+  it("a bro attacks and destroys an adjacent tower", () => {
+    // The other half of BRO_TARGETS. No vault and no briefs, so the tower cannot
+    // fire (update.ts:566,570) and this measures pure bro damage: the bro closes to
+    // 1.58 tiles in ~0.3 s, then lands analyst's 2 dmg once per atkCdMs = 1000 ms
+    // (update.ts:472-475) — ceil(5 ÷ 2) = 3 hits, tower gone at 2.43 s.
+    const w = makeWorld();
+    const t = w.placeEntity("tower", 30, 30)!;
+    t.hp = 5;
+    t.maxHp = 5;
+    const broId = spawnBro(w, "analyst", 33, 30); // 2.55 tiles off (SIZES.tower = 2)
+    tick(w, 4); // 3 hits at 1/s: 2.43 s, so 4 s is ~1.6× margin
+    expect(w.entities.has(t.id)).toBe(false);
+    expect(w.entities.has(broId)).toBe(true); // the unarmed tower never shot back
+    expect(t.input!.total).toBe(0);
   });
 
   it("bros march toward the HQ when impact is flat", () => {
@@ -103,18 +144,30 @@ describe("finance bros", () => {
     expect(w.state).toBe("lost");
   });
 
-  it("bros chase machines through the impact blob instead of stalling", () => {
-    // Regression: greedy impact-maximizing stalled bros at the blob's local
-    // maximum one tile from a machine; they must now pursue and chew it.
+  it("bros chase towers through the impact blob instead of stalling", () => {
+    // Regression: greedy impact-climbing stalled bros at the blob's local maximum.
+    // The pursuit branch (update.ts:482, bestD ≤ 10) now runs on the tower list,
+    // and the machine the blob belongs to has to survive the raid.
     const w = makeWorld();
     const f = w.feeds[0]!;
     const m = w.placeEntity("miner", f.x, f.y)!;
     m.hp = 10;
     m.maxHp = 10;
     powerNear(w, f.x, f.y);
-    spawnBro(w, "analyst", f.x + 4, f.y); // just outside chase range (10)
-    tick(w, 20); // ample time to approach + chew
-    expect(w.entities.has(m.id)).toBe(false);
+    drainSouth(w, m, 24);
+    const ts = findSpot(w, "tower", f.x - 5, f.y, 2);
+    const t = w.placeEntity("tower", ts.x, ts.y)!;
+    t.hp = 10;
+    t.maxHp = 10;
+    spawnBro(w, "analyst", ts.x + 4, ts.y); // 3.54 tiles: in chase range (10), not attack (1.7)
+    tick(w, 1);
+    expect(w.totalImpact()).toBeGreaterThan(0);
+    // 10 hp ÷ 2 dmg = 5 hits at one per 1000 ms, first landing at the 0.93 s it
+    // closes in: dead at 5.13 s. 9 s total is ~1.7× that, so a bro stranded on the
+    // impact gradient (the old bug) fails here rather than passing by luck.
+    tick(w, 8);
+    expect(w.entities.has(t.id)).toBe(false);
+    expect(w.entities.get(m.id)!.hp).toBe(10); // field machine: present, untouched
   });
 });
 
@@ -183,10 +236,10 @@ describe("victory / defeat", () => {
     const w = makeWorld(7, 50_000_000);
     powerNear(w, 40, 40);
     const rs = w.placeEntity("roadshow", 40, 40)!;
-    for (let i = 0; i < 16; i++) bufferAdd(rs.input!, "alpha", 1);
+    for (let i = 0; i < 4; i++) bufferAdd(rs.input!, "alpha", 1);
     w.hired = HIRE_QUOTA;
-    rs.roadshow!.progress = 396;
-    tick(w, 2); // 4 alpha/s → progress crosses 400
+    rs.roadshow!.progress = ROADSHOW_ALPHA_NEEDED - 1;
+    tick(w, 2); // delivery crosses the quota while alpha is in hand
     expect(w.state).toBe("won");
   });
 
@@ -210,11 +263,22 @@ describe("victory / defeat", () => {
     expect(w.timeMs).toBe(t);
   });
 
-  it("brief efficiency tech raises printer output to 3", () => {
+  it("brief efficiency tech raises printer output to 3 per craft", () => {
     const w = makeWorld();
-    expect(RECIPES.brief!.out.brief).toBe(2);
+    powerNear(w, 40, 40);
+    const at = findSpot(w, "printer", 44, 40, 4);
+    const printer = w.placeEntity("printer", at.x, at.y)!;
+    const c = printer.machine!.crafter;
+    bufferAdd(c.input, "clean", 1);
+    bufferAdd(c.input, "signal", 1);
+    tick(w, 3); // recipe is 2s
+    expect(c.output.items.brief).toBe(2);
+    bufferTake(c.output, "brief", 2);
     applyTech(w, "brief-efficiency");
-    expect(RECIPES.brief!.out.brief).toBe(3);
+    bufferAdd(c.input, "clean", 1);
+    bufferAdd(c.input, "signal", 1);
+    tick(w, 3);
+    expect(c.output.items.brief).toBe(3);
   });
 });
 

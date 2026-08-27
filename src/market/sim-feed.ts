@@ -23,7 +23,6 @@ export const DEFAULT_COINS: SimCoin[] = [
 
 interface CoinState {
   price: number;
-  prev: number;
   o: number;
   h: number;
   l: number;
@@ -32,12 +31,23 @@ interface CoinState {
   buy: number;
   sell: number;
   cvd: number;
+  funding: number;
+  lastFundingAt: number;
   sessionStart: number;
   lastCvdAt: number;
 }
 
 const STEP_MS = 100;
 const CVD_INTERVAL_MS = 5_000;
+/** Cap ctx to the documented live cadence even when advance() sub-splits dt. */
+const CTX_INTERVAL_MS = 100;
+/** Fixed epoch: ts_ms reads as a real exchange stamp while staying deterministic. */
+const EPOCH_MS = Date.UTC(2026, 7, 21);
+const DAY_MS = 86_400_000;
+/** Hourly funding walk: mean-reverting, bucketed, plausible magnitude. */
+const FUNDING_PULL = 0.97;
+const FUNDING_STEP = 5e-5;
+const FUNDING_CAP = 0.001;
 
 /**
  * Deterministic market simulator producing the same frame shapes as the desk
@@ -50,7 +60,8 @@ export class SimFeed {
   private readonly coins: SimCoin[];
   private readonly liqPerMin: number;
   private readonly state: Map<string, CoinState>;
-  private t = 0;
+  private t = EPOCH_MS;
+  private lastCtxAt = EPOCH_MS - CTX_INTERVAL_MS;
   private rot = 0;
 
   constructor(opts: SimFeedOptions) {
@@ -61,16 +72,18 @@ export class SimFeed {
     for (const c of this.coins) {
       this.state.set(c.coin, {
         price: c.base,
-        prev: c.base,
         o: c.base,
         h: c.base,
         l: c.base,
         v: 0,
-        minT: 0,
         buy: 0,
         sell: 0,
         cvd: 0,
-        sessionStart: 0,
+        funding: 0,
+        lastFundingAt: -Infinity,
+        // The epoch is a minute boundary, so bar/session stamps never read 0.
+        minT: EPOCH_MS,
+        sessionStart: Math.floor(EPOCH_MS / DAY_MS) * DAY_MS,
         lastCvdAt: -Infinity,
       });
     }
@@ -98,7 +111,6 @@ export class SimFeed {
 
     for (const c of this.coins) {
       const st = this.state.get(c.coin)!;
-      st.prev = st.price;
       st.price = Math.max(1e-6, st.price * (1 + c.vol * this.gauss() * Math.sqrt(sec)));
       st.h = Math.max(st.h, st.price);
       st.l = Math.min(st.l, st.price);
@@ -131,18 +143,31 @@ export class SimFeed {
         st.lastCvdAt = now;
       }
 
+      // Funding re-rerolls would flicker 30x/s on the tape; a 5s bucketed
+      // mean-reverting walk reads like a real funding rate settling.
+      if (now - st.lastFundingAt >= CVD_INTERVAL_MS) {
+        const pulled = st.funding * FUNDING_PULL + this.gauss() * FUNDING_STEP;
+        st.funding = Math.max(-FUNDING_CAP, Math.min(FUNDING_CAP, pulled));
+        st.lastFundingAt = now;
+      }
+
       if (this.rng.chance((this.liqPerMin / 60) * sec)) {
+        const qty = this.rng.int(1, 500); // one draw: the desk fixture satisfies price*qty === notional
         out.push({
           ch: "liq",
-          event: { t: now, coin: c.coin, venue: "sim", side: this.rng.chance(0.9) ? "long" : "short", price: st.price, qty: this.rng.int(1, 500), notional_usd: st.price * this.rng.int(1, 500) },
+          event: { t: now, coin: c.coin, venue: "sim", side: this.rng.chance(0.9) ? "long" : "short", price: st.price, qty, notional_usd: st.price * qty },
         });
       }
     }
 
-    // One ctx frame per step, rotating coins (~10/s total, matching live cadence).
-    const coin = this.coins[this.rot % this.coins.length]!;
-    this.rot++;
-    const st = this.state.get(coin.coin)!;
-    out.push({ ch: "ctx", coin: coin.coin, mark: st.price, oi_base: 0, oi_usd: 0, funding_hourly: this.rng.range(-0.0002, 0.0002), ts_ms: now });
+    // At most one ctx per CTX_INTERVAL_MS of sim time (advance() may split dt
+    // below STEP_MS), rotating coins — ~10/s total, matching live cadence.
+    if (now - this.lastCtxAt >= CTX_INTERVAL_MS) {
+      this.lastCtxAt = now;
+      const coin = this.coins[this.rot % this.coins.length]!;
+      this.rot++;
+      const st = this.state.get(coin.coin)!;
+      out.push({ ch: "ctx", coin: coin.coin, mark: st.price, oi_base: 0, oi_usd: 0, funding_hourly: st.funding, ts_ms: now });
+    }
   }
 }

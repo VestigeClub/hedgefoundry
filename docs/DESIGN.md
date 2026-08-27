@@ -1,6 +1,6 @@
 # HedgeFoundry — Game Design Document
 
-Status: v1 (2026-08-25) · Author: Zain + agent · Target: school demo, blow away the class.
+Status: v1.1 (2026-08-27) · Target: school demo, blow away the class.
 Stack: custom TypeScript engine, web-first (Windows / macOS / any browser).
 Timeline: <2 weeks (M1–M7 below).
 
@@ -75,11 +75,20 @@ overwhelms you.
 ## 5. Systems
 
 ### 5.1 Extraction — Data Feeds & Miners
-- **Data Feed** patches generate Raw Tape; richness (yield/s) and volatility
-  (visual flicker, bro-attract multiplier) vary per patch.
-- **Data Miner** (2×2): 1 patch, outputs Raw Tape to tape/building. Upgradeable
-  via research: speed, yield.
+- **Data Feed** patches carry **richness**, a **1.0–2.2 multiplier** on the
+  drill's base rate — not a raw yield/s — and volatility (visual flicker,
+  bro-attract multiplier).
+- **Data Miner** (2×2): 1 patch. Accumulates
+  `MINER_BASE_RATE × richness × yieldMult × speedMult` Raw Tape per second,
+  `MINER_BASE_RATE = 4` (`src/sim/update.ts`), chosen so a richness-1.8 patch
+  feeds exactly one Signal Cleaner (1 clean/s, §5.3) with headroom for the
+  yield and speed techs. Upgradeable via research: speed, yield.
 - Raw Tape has no other source. Miners need Capital + grid connection.
+- **Throughput is limited by logistics, not by the drill.** A belt accepts the
+  next item only once the tail has cleared `BELT_SPACING`, so one
+  default-speed lane carries roughly 3–6 items/s regardless of how fast the
+  machine above it produces, and a starved drill zeroes its accumulator
+  rather than banking tape. A line is sized by its narrowest lane.
 
 ### 5.2 Logistics — Tape, Dark Pools, Arbitrage, Traders, Market Makers
 - **Ticker Tape** (1×1 belt): 2 lanes (left/right, finance-tape style), items
@@ -94,25 +103,43 @@ overwhelms you.
   (2-wide). Requires research to unlock. *M6, cuttable if time pressure.*
 
 ### 5.3 Processing chain
+Rates below are the shipped `RECIPES` (`src/sim/recipes.ts`): one machine of
+each stage balances the next one exactly, so a chain is `miner → cleaner →
+analytics → factory` with no buffer games.
+
 | Machine | Size | Input | Output | Base rate |
 |---|---|---|---|---|
-| Data Miner | 2×2 | — (patch) | Raw Tape | 1.0/s |
-| Signal Cleaner | 3×3 | Raw Tape 1 | Clean Data 1 | 0.5/s |
-| Analytics Engine | 3×3 | Clean Data 2 | Signals 1 | 0.33/s |
-| Strategy Factory | 3×3 | Signals 3 | Alpha 1 | 0.2/s |
-| Legal Printer | 2×2 | Clean Data 1 + Signals 1 | Brief 2 | 0.5/s |
-| Research Desk | 3×3 | Alpha 1 + Signals 1 | (consumed) | 0.1/s |
+| Data Miner | 2×2 | — (patch) | Raw Tape | 4/s × richness (1.0–2.2) |
+| Signal Cleaner | 3×3 | Raw Tape 1 | Clean Data 1 | 1.0/s |
+| Analytics Engine | 3×3 | Clean Data 2 | Signals 1 | 0.5/s |
+| Strategy Factory | 3×3 | Signals 2 | Alpha 1 | 0.25/s |
+| Legal Printer | 2×2 | Clean Data 1 | Brief 2 | 0.5/s |
+| Research Desk | 3×3 | Alpha 1 + Signals 1 | (consumed) | 0.125/s |
 
-All machines: fixed craft recipe, no quality tiers (v1), buffer of 1 craft.
+Two rules make those rates behave in a real plant:
+- **No ingredient may fill a shared intake.** A pad is a queue for every input
+  a recipe starts from, so each one gets `ceil(cap / kinds)` slots. Otherwise a
+  fast analytics lane packs all twelve slots of a research desk and the slow
+  factory lane is refused forever — a desk holding only half a recipe never
+  crafts, and the lab silently stops researching.
+- **Terminal sinks write off surplus.** Research points, IPO alpha and tower
+  ammo are consumed, never resold, and a cascade cannot balance to the tick,
+  so a full sink accepts and discards rather than backing its belt up and
+  freezing every machine upstream of it.
+
+All machines: fixed craft recipe, no quality tiers (v1), a 12-slot input pad
+per ingredient share and a 4-slot output buffer.
 
 ### 5.4 Capital — the power system
-- **Funding Desk** (2×2, the "boiler"): consumes fuel → Capital at fixed rate.
-  Fuel tiers unlock via research:
-  - T0: Clean Data (cheap, inefficient: 2/s → 40 Capital/s)
-  - T1: Signals (4/s → 160 Capital/s)
-  - T2: Alpha (2/s → 600 Capital/s)
-- **Treasury Vault** (2×2, accumulator): stores Capital (cap 50k base, research
-  +capacity). Grid node.
+- **Funding Desk** (2×2, the "boiler"): consumes fuel → Capital. It sells the
+  fuel rather than burning it: it accepts whatever the current fuel tier
+  prices, at that tier's `ratePerSec`, and pays `price × seconds of fuel`
+  (§5.6). Fuel tiers unlock via research:
+  - T0: Clean Data — 1.0/s at 250 $ = 250 $/s
+  - T1: Signals — 0.5/s at 900 $ = 450 $/s
+  - T2: Alpha — 0.25/s at 3,500 $ = 875 $/s
+- **Treasury Vault** (2×2, accumulator): stores Capital, raises the bank cap.
+  Grid node.
 - **Treasury Link** (1×1 pole): range 7 tiles, connects machines to grid.
 - Every machine has **burn** (Capital/s): Miner 10, Cleaner 20, Analytics 30,
   Factory 60, Printer 15, Desk 20, Tower 25, Funding 0 (net producer).
@@ -150,9 +177,15 @@ desk moves on. Desk idles without a target. Current tree (12 techs):
 - **Spawning**: bros spawn at map edges/"rival funds" (bases). Wave cadence
   scales with evolution; a burst event fires when real-market **liq** bursts
   arrive (live mode) or synthetic stress events (sim mode).
-- **Attraction**: bros path (flow-field on tile grid, throttled) toward
-  highest-impact regions → HQ and machines. Attack: chew machines down
-  (HP), destroy on 0 → machine wreck (remove entity).
+- **Attraction**: bros gravitate to the highest-impact regions, then home on
+  the Fund Office. **Targets are the office and the compliance towers only**
+  (`BRO_TARGETS`, `src/sim/update.ts`): impact decides where a bro walks,
+  never what it may chew, so field machines are immune and a raid costs you
+  defence and the office.
+  - **Open question**: the original design had bros chewing machines, which
+    is what made expansion cost something. With machines immune, a base can
+    grow without its plant ever being at risk, and the only pressure is the
+    office wall. Decide deliberately whether to re-open machine damage.
 - **Types** (scale with evolution):
   - **Analyst** (small, fast, 20 HP, 2 dmg)
   - **Trader** (medium, 60 HP, 6 dmg)
@@ -170,13 +203,19 @@ desk moves on. Desk idles without a target. Current tree (12 techs):
 - Hiring techs (M5): Comp Discount I/II (−15%/−30% hire comp).
 
 ### 5.8 Victory — the IPO
-- **Roadshow** (4×4, the rocket silo): consumes Alpha (1/s) + requires hired
-  quota reached (250 bros). Build cost: $2M.
-- Quota check: top-bar progress `BROS HIRED 137/250`.
-- When Roadshow delivers its Alpha requirement (400, at 4/s ≈ 100 s of
-  sustained delivery), **IPO launch**
-  sequence plays (countdown, ticker frenzy, confetti of green candles) →
-  victory screen + **end-game report** (§9).
+- **Roadshow** (4×4, the rocket silo): burns Alpha until the IPO closes.
+  Build cost $120k (`COSTS.roadshow`), and it bills power whether or not it is
+  fed (`ALWAYS_ON`).
+- **Quota**: 250 hired heads (`HIRE_QUOTA`), shown as `BROS HIRED 137/250`.
+  Hiring is the win condition **and** the cheap defence: a bro converted at
+  the wall costs its comp once — there is no ongoing salary — so 250 heads is
+  roughly $1.1M of comp, less `comp-discount-2` (≈ $770k).
+- **Alpha requirement**: 40 units delivered (`ROADSHOW_ALPHA_NEEDED`), at
+  ≈ 0.89/s so about 45 s of sustained delivery. Alpha needs no research to be
+  *delivered* — the roadshow takes it at any fuel tier — so the IPO is gated
+  on plant, cash and survival, not on the tech tree.
+- Quota + 40 alpha ⇒ **IPO launch** sequence (countdown, ticker frenzy,
+  confetti of green candles) → victory screen + **end-game report** (§9).
 
 ### 5.9 Defeat
 - Margin call (Capital = 0 for 10 s) → liquidation screen.
@@ -186,13 +225,15 @@ desk moves on. Desk idles without a target. Current tree (12 techs):
 
 ## 6. Live market integration (the wow) — read-only desk relay
 
-Source: the configured market-data server at `ws://desk-host:5299/ws/stream`
-(verified live 2026-08-25, 12 channels, feeds healthy, zero warnings).
-**Read-only: relay only consumes; the desk is never modified.**
+Source: a **user-supplied market-data server**, addressed entirely by
+configuration — `DESK_WS` (WebSocket stream) and `DESK_REST` (candle pulls for
+`/seed`), see `.env.example`. There is no hard-coded host anywhere in the repo;
+unset both and the game runs on its own deterministic feed.
+**Read-only: the relay only consumes; the upstream server is never modified.**
 
-Relay picks the **L1 subset only** (user directive: nothing with crazy depth):
+Relay picks the **L1 subset only** (nothing with crazy depth):
 
-| ch | frame (verified from the wire capture) | use in game |
+| ch | frame shape | use in game |
 |---|---|---|
 | `ctx` | `{coin, mark, oi_base, oi_usd, funding_hourly, ts_ms}` (~11/s) | **ticker tape**: live mark prices per coin |
 | `candle` | `{coin, tf:"1m", bar:{t,o,h,l,c,v}}` (~7/s) | tape sparklines; world-seed volatility |
@@ -202,9 +243,8 @@ Relay picks the **L1 subset only** (user directive: nothing with crazy depth):
 Dropped: `book`, `bookheat` (L2 depth), `whale` (too heavy + gated), `brief`,
 `fbar`, `agent`, `health`, `watch`.
 
-Architecture:
 ```
-the desk (desk-host:5299, read-only WS) ──► server/relay.mjs (Node 24, zero-dep)
+market-data server (DESK_WS, read-only WS) ──► server/relay.mjs (Node 24, zero-dep)
                                             │  :7891/stream  SSE — L1 live passthrough
                                             │  :7891/seed    realized vol, 2d 1m candles
                                             │  :7891/        serves dist/ statically
@@ -213,14 +253,14 @@ the desk (desk-host:5299, read-only WS) ──► server/relay.mjs (Node 24, zer
                                   └─ relay silent >2 s → embedded SimFeed (same wire)
 ```
 **Relay** (`server/relay.mjs`, Node 24, zero-dep): one read-only WS client to
-the desk (broadcast-all — the server is built for multiple consumers); filters
-to the L1 subset; re-serves as **SSE** (`/stream`) so the browser needs no
-WS handshake. Also serves `/seed` (realized vol from 2 days of 1m BTC
-candles — `{coin,tf,bars:[{t,o,h,l,c,v}]}` shape verified from the desk
-fixture) and `dist/` statically (LAN demo = one process). Every relay frame
-carries `src: "live"`. If the relay is unreachable or silent for 2 s, the
-**client falls back to its embedded deterministic SimFeed** (`src: "sim"`)
-— the professor's demo never depends on the LAN.
+`DESK_WS` (broadcast-all — the upstream is built for multiple consumers);
+filters to the L1 subset; re-serves as **SSE** (`/stream`) so the browser needs
+no WS handshake. Also serves `/seed` (realized vol from 2 days of 1m BTC
+candles — `{coin,tf,bars:[{t,o,h,l,c,v}]}`) and `dist/` statically (LAN demo =
+one process). Every relay frame carries `src: "live"`. If the relay is
+unreachable or silent for 2 s, the **client falls back to its embedded
+deterministic SimFeed** (`src: "sim"`) — a demo never depends on the LAN, and
+neither the host nor the port of the upstream is known to the game.
 - Game wire format (game-defined, one JSON line per frame):
   `{"src":"live","ch":"ctx","coin":"BTC","mark":77152.0,"funding_hourly":0.00011,"ts_ms":…}`
   `{"src":"live","ch":"candle","coin":"BTC","tf":"1m","bar":{"t":…,"o":…,"h":…,"l":…,"c":…,"v":…}}`
@@ -289,28 +329,48 @@ P&L. Exports as PNG (canvas capture) + copyable text. This is the
   a mid laptop; culling, pre-rendered tile chunks, batched sprite draw
   (offscreen canvas per sprite, single drawImage pass per layer).
 
-## 11. Balance table (v0 — the tuning contract)
-All in game units. Capital starts **$1,000,000**. Base burn vs funding:
-- Funding Desk T0: 2 Clean Data/s → 40 Capital/s. One feed + 2 cleaners +
-  1 funding desk ≈ break-even on a starter line. Vault cap 50k.
-- Costs: Miner $50k, Cleaner $80k, Analytics $120k, Factory $250k, Funding
-  $60k, Vault $40k, Link $2k, Trader $15k, Tape $10k, Dark Pool $30k,
-  Arbitrage $25k, Printer $90k, Tower $110k, Research Desk $200k, Roadshow
-  $2M.
-- Bros: Analyst comp $20k, Trader $60k, MD $180k, Quant $500k. Quota 250.
-  Evolution: 0→1 over ~45 min of active impact at moderate play; affects
-  spawn mix + comp.
-- Research: each tech costs craft-points (5–18 lab crafts, one desk ~1–3 min
-  per tech); ~6–10 techs per playthrough.
-- Roadshow: consumes 400 Alpha at 4/s (~100 s sustained delivery) once the
-  hire quota is met; build cost $2M.
-- Tuning method: Vitest simulation harness runs scripted "optimal" play →
-  assert IPO reachable by ~40–50 min; defeat possible by neglect ~15 min.
-- **Known tension (tuning pass pending)**: funding income caps at
-  `capitalCapacity` (1M + 50K/vault) while the 250-hire quota costs ~$5M+ in
-  comp — a full playthrough needs either more vaults, cheaper comps, or a
-  higher funding ceiling. The demo mode sidesteps this with a seed-round
-  top-up; the real-game economy needs a balance pass before hand-in.
+## 11. Balance table (v1 — the tuning contract, measured)
+Every number below is what the code ships (`src/sim/{world,recipes}.ts`); the
+payback rows are measured by `src/sim/reachability.test.ts`, not estimated.
+
+- **Start**: $400k capital (`STARTING_CAPITAL`) — a starter base *or* the lab
+  pair (~139k), so the first decision is production versus research. Bank cap
+  2M, +250k per vault (`VAULT_CAPACITY`); never binding at these incomes.
+- **Costs**: Miner 4k, Cleaner 8k, Analytics 20k, Factory 45k, Printer 12k,
+  Research 30k, Funding 12k, Vault 6k, Link 2k, Belt 800, Trader 4k,
+  Tower 15k, Roadshow 120k.
+- **Fuel prices** (a desk sells its fuel, it does not burn it): clean 250,
+  signal 900, alpha 3 500. Priced so every rung of the ladder returns its
+  build cost in about the same time — that is what makes the choice one of
+  scale rather than of survival:
+
+| Rung | Line cost | Gross | Net | Payback |
+|---|---|---|---|---|
+| clean (miner→cleaner→desk) | 24k | 1.00/s × 250 | +220 $/s | 109 s |
+| signal (+ analytics) | 44k | 0.50/s × 900 | +390 $/s | 113 s |
+| alpha (+ factory) | 89k | 0.25/s × 3 500 | +755 $/s | 118 s |
+
+  Measured on ten-line farms under the harness: clean 2.0–2.6 k $/s, signal
+  3.3–4.3 k $/s, no brownout (`w.multiplier == 1`).
+- **Hiring is the money sink and the win gate**: comp is charged **once** per
+  head (analyst 4k, trader 10k, MD 25k, quant 50k, less `comp-discount`
+  −15 %/−30 %) and there is no ongoing salary. 250 heads ≈ $1.1 M, ≈ $770 k
+  with both discounts. The old note claiming "$5 M+ in comp against a $1 M
+  ceiling" was wrong about both numbers.
+- **Research** is the strategic ceiling, not money: one desk burns 1 alpha +
+  1 signal per 8 s = 0.125 points/s against a route of roughly 200 points, so
+  a single desk is ~25 minutes of a 40-minute run. Extra desks need ground,
+  power and an alpha feed each.
+- **Bros**: live cap `round(24 × (0.5 + evolution))` — 12 at evolution 0, 36 at
+  1; wave interval eases 20 s → 4 s; +7e-5 evolution per point of impact.
+  Comp as above. Raids cost the office and the towers (§5.7).
+- **Tuning method**: the Vitest harness plays scripted optimal money rules and
+  asserts the ladder is net-positive and the quota payable.
+- **Open, measured, not hidden**: scripted play fills the 250-head quota and
+  survives the full 40 minutes but does not reach the IPO — research
+  throughput (§5.5) is the binding constraint, and a plant that lets a sales
+  desk buy the lab's own signal starves its tech tree. Fixing the economy
+  route to the roadshow is the remaining balance work.
 
 ## 12. Milestones (2 weeks, from 2026-08-25)
 - **M1 (d1–2)**: stack up (Vite+TS+Vitest+gate), engine core (loop, camera,
@@ -329,18 +389,25 @@ All in game units. Capital starts **$1,000,000**. Base burn vs funding:
   flythrough), cross-platform verification (Windows Chrome/Edge, MacBook
   Safari/Chrome, professor browser), README play guide, presentation assets.
 
-## 12b. Shipped status (2026-08-25 →)
+## 12b. Shipped status (2026-08-27 →)
 - **Done**: M1–M7 sim + UI (production chain, belts/traders, power/brownout,
   research, bros/impact/defense, hire, HQ, margin call, IPO roadshow,
   win/lose overlays + end-game report with capital sparkline), live market
-  relay (L1 read-only) with client-side SimFeed fallback, autosave +
-  resume, WebAudio synth SFX, `?demo` cinematic autoplay.
-- **Gate**: `npm run check` = typecheck + 75 Vitest tests + Vite build.
-- **Verified live**: Windows Chrome via headless driver (production flow,
-  bro raids, tower defense, hiring, save/resume, demo IPO win).
+  relay (L1 read-only) with client-side SimFeed fallback, autosave + resume,
+  WebAudio synth SFX, `?demo` cinematic autoplay.
+- **Gate**: `npm run check` = typecheck + 117 Vitest tests (16 files) + Vite
+  build, all green.
+- **Proven by simulation** (`src/sim/reachability.test.ts`): each production
+  rung is net-positive (clean 2.0–2.6 k $/s on a ten-line farm, signal
+  3.3–4.3 k $/s), and a scripted fund — build, defend, expand, hire — pays
+  its 250-head quota and holds the office for a full 40-minute run.
+- **Open balance gap, recorded not hidden**: the same scripted fund never
+  reaches the IPO. One research desk cannot feed its own two-ingredient recipe
+  at the rate the tech route demands, so the run plateaus at fuel tier 1.
+  The win condition itself is covered directly (`src/sim/endings.test.ts`);
+  the economy route to it is the known unfinished work (§5.5).
 - **Cross-platform**: any browser opens `http://<host>:7891` (relay serves
-  `dist/`); zero install. MacBook on LAN (ping OK, SSH closed) — Safari/
-  Chrome check pending on-site.
+  `dist/`); zero install. macOS browser check pending.
 
 ## 13. Non-goals (scope guard — v1)
 No fluids/derivatives, no logistics bots, no circuit network, no blueprints,

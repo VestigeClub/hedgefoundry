@@ -109,12 +109,26 @@ describe("mining + belts", () => {
     const miner = w.entities.get(minerId)!;
     const f = w.feeds[0]!;
     const belt = w.placeEntity("belt", miner.x - 1, f.y)!;
+    belt.belt!.dir = "W"; // leads away from the drill
     tick(w, 5);
     expect(w.totals.tape).toBeGreaterThanOrEqual(4);
     expect(belt.belt!.items.length).toBeGreaterThan(0);
     // conservation: every produced item is either on the belt or in the
     // buffer — no duplication, no loss.
     expect(w.totals.tape).toBe(belt.belt!.items.length + miner.miner!.output.total);
+  });
+
+  it("output is never loaded into a belt that runs back into its own machine", () => {
+    const w = makeWorld();
+    const minerId = rig(w);
+    const miner = w.entities.get(minerId)!;
+    const f = w.feeds[0]!;
+    const belt = w.placeEntity("belt", miner.x - 1, f.y)!; // dir E → runs into the drill
+    tick(w, 5);
+    // Such an item can never be delivered (the machine rejects its own
+    // product), it parks at the lane head and blocks the line behind it.
+    expect(belt.belt!.items.length).toBe(0);
+    expect(miner.miner!.output.total).toBeGreaterThan(0); // waits in the buffer
   });
 
   it("belt items stay sorted ascending after pushes (queue-jump fix)", () => {

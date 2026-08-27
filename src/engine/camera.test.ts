@@ -63,4 +63,49 @@ describe("Camera", () => {
     expect(v.x1).toBe(41);
     expect(v.y0).toBe(-1);
   });
+
+  it("centerOn puts the world point at the view centre", () => {
+    for (const zoom of [1, 2]) {
+      const c = cam();
+      c.zoom = zoom;
+      c.centerOn(500, -40);
+      expect(c.x).toBeCloseTo(500 - 640 / zoom, 9);
+      expect(c.y).toBeCloseTo(-40 - 360 / zoom, 9);
+      // the view centre maps back to the requested world point
+      const mid = c.screenToWorld(640, 360);
+      expect(mid.x).toBeCloseTo(500, 9);
+      expect(mid.y).toBeCloseTo(-40, 9);
+    }
+  });
+
+  it("clampTo keeps the view origin within the world (half-view slack)", () => {
+    const cases = [
+      { w: 100, h: 100, zoom: 0.5 },
+      { w: 100, h: 100, zoom: 3 },
+      { w: 8192, h: 8192, zoom: 0.5 },
+      { w: 8192, h: 8192, zoom: 3 },
+    ] as const;
+    for (const k of cases) {
+      const c = cam(); // view 1280×720
+      c.zoom = k.zoom;
+      const xLo = -1280 / k.zoom / 2;
+      const xHi = Math.max(xLo, k.w - 1280 / k.zoom / 2);
+      const yLo = -720 / k.zoom / 2;
+      const yHi = Math.max(yLo, k.h - 720 / k.zoom / 2);
+      c.x = 1e9;
+      c.y = -1e9;
+      c.clampTo(k.w, k.h);
+      expect(c.x).toBeCloseTo(xHi, 6);
+      expect(c.y).toBeCloseTo(yLo, 6);
+      c.x = -1e9;
+      c.y = 1e9;
+      c.clampTo(k.w, k.h);
+      expect(c.x).toBeCloseTo(xLo, 6);
+      expect(c.y).toBeCloseTo(yHi, 6);
+      // idempotent: an already-clamped origin is untouched
+      c.clampTo(k.w, k.h);
+      expect(c.x).toBeCloseTo(xLo, 6);
+      expect(c.y).toBeCloseTo(yHi, 6);
+    }
+  });
 });

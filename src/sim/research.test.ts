@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { generateMap } from "../world/mapgen";
 import { tickWorld } from "./update";
-import { World, type EntityKind } from "./world";
+import { World, VAULT_CAPACITY, type EntityKind } from "./world";
 import { bufferAdd } from "./production";
 import { TECHS, applyTech } from "./research";
+import { FUEL_PRICE, FUNDING_FUELS, RECIPES } from "./recipes";
 
 const DT = 33.3333;
+
+/** updateMiner's tape/s at richness 1.0 (update.ts:98 — private there). */
+const MINER_BASE_RATE = 4;
 
 function makeWorld(seed = 7, startCapital?: number): World {
   const { map, feeds } = generateMap({ width: 128, height: 128, seed, startClearRadius: 14, poolClusters: 25 });
@@ -68,22 +72,48 @@ describe("research tree", () => {
   it("miner speed tech accelerates extraction", () => {
     const w = makeWorld();
     const f = w.feeds[0]!;
-    w.placeEntity("miner", f.x, f.y);
-    const fs = findSpot(w, "funding", f.x + 10, f.y, 6);
-    w.placeEntity("funding", fs.x, fs.y);
-    const vs = findSpot(w, "vault", f.x + 14, f.y, 6);
+    const miner = w.placeEntity("miner", f.x, f.y)!;
+    const vs = findSpot(w, "vault", f.x - 2, f.y, 2);
     w.placeEntity("vault", vs.x, vs.y);
     tickWorld(w, DT);
-    const miner = [...w.entities.values()].find((e) => e.kind === "miner")!;
     expect(w.powered.has(miner.id)).toBe(true); // rig must be in range
-    // drain belt so the 4-slot output buffer never saturates
-    for (let i = 0; i < 4; i++) w.placeEntity("belt", miner.x + miner.w + i, miner.y);
-    tick(w, 5);
-    const before = w.totals.tape;
-    applyTech(w, "miner-speed-1");
-    tick(w, 5);
-    const after = w.totals.tape;
-    expect(after - before).toBeGreaterThan(before + 1); // strictly faster after +25%
+    expect(w.multiplier).toBe(1); // no brownout: one miner bills 10/s (§5.4)
+    // Drain the rig first: a jam zeroes rateAcc (update.ts:108-111), which would
+    // hide the tech. Belts are pumped to 12 tiles/s because the default 1.5 frees
+    // a tail slot only every BELT_SPACING/speed ≈ 5 ticks — that caps one intake
+    // belt at ~3 tape/s, under this rig's 7.2 tape/s, and 24 tiles hold the 80
+    // tape both measurement windows push through (5 items per tile).
+    for (let i = 0; i < 24; i++) {
+      const b = w.placeEntity("belt", miner.x, miner.y + miner.h + i);
+      if (!b) break;
+      b.belt!.dir = "S";
+      b.belt!.speed = 12;
+    }
+    tickWorld(w, DT);
+    const richness = w.feedAt(f.x, f.y)!.richness; // a 1.0–2.2 multiplier (mapgen.ts)
+    // Ticks to pull `n` tape from a zeroed accumulator: updateMiner adds
+    // MINER_BASE_RATE × richness × (1 + 0.25 × minerSpeed) × dt per tick, so it is
+    // ceil(n ÷ that per-tick amount).
+    const ticksFor = (n: number): number => {
+      miner.miner!.rateAcc = 0;
+      const start = w.totals.tape;
+      let steps = 0;
+      while (w.totals.tape - start < n && steps < 900) {
+        tickWorld(w, DT);
+        steps++;
+      }
+      expect(steps).toBeLessThan(900); // the lane never jammed
+      return steps;
+    };
+    const predicted = (n: number, speedMult: number) =>
+      Math.ceil(n / (MINER_BASE_RATE * richness * speedMult * (DT / 1000)));
+    const plain = ticksFor(40);
+    expect(plain).toBe(predicted(40, 1)); // 4 × 1.8 = 7.2 tape/s → 167 ticks
+    applyTech(w, "miner-speed-1"); // "Miners +25%" → tech.minerSpeed 1 (research.ts:54)
+    expect(w.tech.minerSpeed).toBe(1);
+    const boosted = ticksFor(40);
+    expect(boosted).toBe(predicted(40, 1 + 0.25)); // speedMult 1.25 → 134 ticks
+    expect(boosted).toBeLessThan(plain); // the same harvest, strictly sooner
   });
 
   it("fuel tier switches funding to signals", () => {
@@ -91,15 +121,29 @@ describe("research tree", () => {
     const f = w.feeds[0]!;
     const fs = findSpot(w, "funding", f.x + 10, f.y, 6);
     const funding = w.placeEntity("funding", fs.x, fs.y)!;
-    applyTech(w, "fuel-tier-1");
+    const signal = FUNDING_FUELS.find((x) => x.fuel === "signal")!;
+    // A desk burns one analytics line's output (recipes.ts: ratePerSec =
+    // recipeRate(signal) = 1000/2000 = 0.5/s) at FUEL_PRICE.signal 900 → 450 CAP/s.
+    expect(signal.ratePerSec).toBe(1000 / RECIPES.signal!.timeMs);
+    expect(signal.capPerSec).toBe(FUEL_PRICE.signal * signal.ratePerSec);
+    expect(signal.capPerSec).toBe(450);
+    applyTech(w, "fuel-tier-1"); // unlocks the signal tier (recipes.ts FUEL_TIER 1)
     bufferAdd(funding.funding!.input, "signal", 8);
     const before = w.capital;
     tick(w, 4);
-    // T1: 160 CAP/s, but the 8-slot buffer holds only 2s of fuel (4/s).
-    const delta = w.capital - before;
-    expect(delta).toBeGreaterThan(280); // ≈ 320 (2s × 160)
-    expect(delta).toBeLessThan(350);
+    expect(funding.funding!.selling).toBe("signal"); // switched off clean fuel
+    // 4 s × 450 = 1800; the sim only ran 120 × 33.3333 ms = 3.999996 s of it.
+    expect(w.capital - before).toBeCloseTo(4 * signal.capPerSec, 1);
+    // The desk buffer is 24 slots (world.ts:323) and 0.5/s burns 2 units in 4 s.
+    expect(funding.funding!.input.total).toBeCloseTo(8 - 4 * signal.ratePerSec, 2);
+    // 8 units ÷ 0.5 per s = 16 s of tank, so by t = 18 s it is dry: the last
+    // partial burn takes exactly what was left, so the buffer reads a hard 0.
+    tick(w, 14);
     expect(funding.funding!.input.total).toBe(0);
+    expect(w.capital - before).toBeCloseTo(16 * signal.capPerSec, 0); // 7200: 16 s of tank, no more
+    const dry = w.capital;
+    tick(w, 4);
+    expect(w.capital).toBe(dry); // an unfed desk earns nothing
   });
 
   it("tape speed tech accelerates belts", () => {
@@ -117,6 +161,6 @@ describe("research tree", () => {
     const w = makeWorld();
     const base = w.capitalCapacity();
     applyTech(w, "vault-cap-1");
-    expect(w.capitalCapacity()).toBe(base + 50_000);
+    expect(w.capitalCapacity()).toBe(base + VAULT_CAPACITY);
   });
 });

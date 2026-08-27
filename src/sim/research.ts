@@ -5,7 +5,7 @@
  * moves on. Effects are flat level increments in World.tech.
  */
 import type { World } from "./world";
-import { RECIPES } from "./recipes";
+import { FUNDING_FUELS } from "./recipes";
 
 export interface TechState {
   minerSpeed: number;
@@ -56,12 +56,12 @@ export const TECHS: TechDef[] = [
   { id: "cleaner-speed-1", label: "CLEANER SPEED I", desc: "Cleaners +25%", cost: 6, effect: { cleanerSpeed: 1 } },
   { id: "trader-speed-1", label: "TRADER SPEED I", desc: "Traders +25%", cost: 6, effect: { traderSpeed: 1 } },
   { id: "tape-speed-2", label: "TAPE SPEED II", desc: "Belts +50%", cost: 10, requires: ["tape-speed-1"], effect: { tapeSpeed: 2 } },
-  { id: "vault-cap-1", label: "VAULT CAPACITY I", desc: "+50K reserve", cost: 8, effect: { vaultCapLvl: 1 } },
+  { id: "vault-cap-1", label: "VAULT CAPACITY I", desc: "+250K reserve", cost: 8, effect: { vaultCapLvl: 1 } },
   { id: "analytics-speed-1", label: "ANALYTICS SPEED I", desc: "Analytics +25%", cost: 9, effect: { analyticsSpeed: 1 } },
-  { id: "fuel-tier-1", label: "FUEL TIER I", desc: "Funding burns SIGNALS · 160 CAP/s", cost: 10, effect: { fuelTier: 1 } },
+  { id: "fuel-tier-1", label: "FUEL TIER I", desc: `Funding may now sell ${FUNDING_FUELS[1]!.label} · ${Math.round(FUNDING_FUELS[1]!.capPerSec)} CAP/s`, cost: 10, effect: { fuelTier: 1 } },
   { id: "factory-speed-1", label: "FACTORY SPEED I", desc: "Factories +25%", cost: 12, effect: { factorySpeed: 1 } },
-  { id: "vault-cap-2", label: "VAULT CAPACITY II", desc: "+100K reserve", cost: 14, requires: ["vault-cap-1"], effect: { vaultCapLvl: 2 } },
-  { id: "fuel-tier-2", label: "FUEL TIER II", desc: "Funding burns ALPHA · 600 CAP/s", cost: 18, requires: ["fuel-tier-1"], effect: { fuelTier: 2 } },
+  { id: "vault-cap-2", label: "VAULT CAPACITY II", desc: "+500K reserve", cost: 14, requires: ["vault-cap-1"], effect: { vaultCapLvl: 2 } },
+  { id: "fuel-tier-2", label: "FUEL TIER II", desc: `Funding may now sell ${FUNDING_FUELS[2]!.label} · ${Math.round(FUNDING_FUELS[2]!.capPerSec)} CAP/s`, cost: 18, requires: ["fuel-tier-1"], effect: { fuelTier: 2 } },
   { id: "tower-range-1", label: "COMPLIANCE RANGE I", desc: "Towers +4 tiles", cost: 9, effect: { towerRange: 1 } },
   { id: "tower-damage-1", label: "TOWER DAMAGE I", desc: "Towers +8 dmg", cost: 10, effect: { towerDamage: 1 } },
   { id: "tower-damage-2", label: "TOWER DAMAGE II", desc: "Towers +16 dmg", cost: 14, requires: ["tower-damage-1"], effect: { towerDamage: 2 } },
@@ -80,10 +80,6 @@ export function applyTech(w: World, id: string): void {
   for (const [key, value] of Object.entries(t.effect)) {
     const k = key as keyof TechState;
     w.tech[k] = Math.max(w.tech[k], value ?? 0);
-  }
-  if (id === "brief-efficiency" && RECIPES.brief) {
-    // Printer recipe output 2 → 3 per craft.
-    RECIPES.brief.out.brief = 3;
   }
   w.researched.add(id);
 }

@@ -33,10 +33,10 @@ export type EntityKind =
 export type BroType = "analyst" | "trader" | "md" | "quant";
 
 export const BRO_STATS: Record<BroType, { hp: number; dmg: number; speed: number; comp: number; label: string }> = {
-  analyst: { hp: 20, dmg: 2, speed: 1.6, comp: 20_000, label: "ANALYST" },
-  trader: { hp: 60, dmg: 6, speed: 1.1, comp: 60_000, label: "TRADER" },
-  md: { hp: 200, dmg: 15, speed: 0.7, comp: 180_000, label: "MANAGING DIRECTOR" },
-  quant: { hp: 400, dmg: 25, speed: 0.5, comp: 500_000, label: "QUANT" },
+  analyst: { hp: 20, dmg: 2, speed: 1.6, comp: 4_000, label: "ANALYST" },
+  trader: { hp: 60, dmg: 6, speed: 1.1, comp: 10_000, label: "TRADER" },
+  md: { hp: 200, dmg: 15, speed: 0.7, comp: 25_000, label: "MANAGING DIRECTOR" },
+  quant: { hp: 400, dmg: 25, speed: 0.5, comp: 50_000, label: "QUANT" },
 };
 
 export interface BeltItem {
@@ -56,7 +56,7 @@ export interface Entity {
   /** Captured research target while the desk crafts (research machines). */
   researchTarget?: string | null;
   miner?: { output: Buffer; rateAcc: number };
-  funding?: { input: Buffer; fuelAcc: number };
+  funding?: { input: Buffer; selling: Item | null };
   belt?: { dir: Dir; speed: number; items: BeltItem[] };
   trader?: { dir: Dir; cooldownMs: number; busyMs: number };
   /** Generic input buffer (tower ammo, roadshow alpha). */
@@ -87,22 +87,26 @@ export const SIZES: Record<EntityKind, number> = {
   bro: 1,
 };
 
-/** Build costs in capital (DESIGN.md §11). */
+/**
+ * Build costs in capital (DESIGN.md §11). Sized so a starter line (miner +
+ * tape + cleaner + funding) is ~1/4 of the opening reserve and a winning
+ * production floor (~12 lines + defence + roadshow) fits under the cap.
+ */
 export const COSTS: Record<EntityKind, number> = {
-  miner: 50_000,
-  cleaner: 80_000,
-  analytics: 120_000,
-  factory: 250_000,
-  printer: 90_000,
-  research: 200_000,
-  funding: 60_000,
-  vault: 40_000,
+  miner: 4_000,
+  cleaner: 8_000,
+  analytics: 20_000,
+  factory: 45_000,
+  printer: 12_000,
+  research: 30_000,
+  funding: 12_000,
+  vault: 6_000,
   link: 2_000,
-  belt: 10_000,
-  trader: 15_000,
-  tower: 110_000,
+  belt: 800,
+  trader: 4_000,
+  tower: 15_000,
   hq: 0,
-  roadshow: 2_000_000,
+  roadshow: 120_000,
   bro: 0,
 };
 
@@ -124,13 +128,31 @@ export const KIND_LABEL: Record<EntityKind, string> = {
   bro: "FINANCE BRO",
 };
 
-export const BASE_CAPITAL_CAP = 1_000_000;
-export const VAULT_CAPACITY = 50_000;
+/**
+ * Opening reserve. Priced against a clean line (~26k: miner + cleaner + desk
+ * + tape) and the lab pair (~139k): enough for a starter base plus the lab,
+ * so the first real decision is whether to spend on production or on
+ * research, and neither order is free (DESIGN.md §11).
+ */
+export const STARTING_CAPITAL = 400_000;
+/** Hard ceiling; treasury vaults raise it by VAULT_CAPACITY each. */
+export const BASE_CAPITAL_CAP = 2_000_000;
+/** Capital headroom one treasury vault adds (DESIGN.md §5.4). */
+export const VAULT_CAPACITY = 250_000;
 export const POWER_RANGE = 7; // tiles, manhattan (DESIGN.md §5.4)
 export const BROWN_OUT_BUFFER_SEC = 2;
 export const HIRE_QUOTA = 250;
-export const ROADSHOW_ALPHA_NEEDED = 400;
+/**
+ * Alpha a roadshow must burn to close the IPO. 40 units, delivered over
+ * ~45 s — the finale should be a supply check, not a waiting room
+ * (DESIGN.md §5.10).
+ */
+export const ROADSHOW_ALPHA_NEEDED = 40;
+export const ROADSHOW_DELIVERY_PER_SEC = ROADSHOW_ALPHA_NEEDED / 45;
 export const IMPACT_CELL = 4; // tiles per impact cell (64×64 on a 256 map)
+
+/** Defence and the roadshow bill whether or not they act (DESIGN.md §5.4). */
+export const ALWAYS_ON: Partial<Record<EntityKind, true>> = { tower: true, roadshow: true };
 
 export interface WorldOpts {
   map: TileMap;
@@ -164,6 +186,17 @@ export class World {
   hired = 0;
   state: "playing" | "won" | "lost" = "playing";
   marginCallMs = 0;
+  lossReason: "margin" | "hq" | null = null;
+  brosKilled = 0;
+  hiresByType: Record<BroType, number> = { analyst: 0, trader: 0, md: 0, quant: 0 };
+  waves = 0;
+  /** Last 200 notable events, newest last (end-game report). */
+  timeline: Array<{ t: number; msg: string }> = [];
+  /** 10 s samples for the end-game P&L curve. */
+  capHistory: Array<{ t: number; capital: number; alpha: number }> = [];
+  /** Entities that did work during the previous tick (drives the power bill). */
+  working = new Set<number>();
+  private workingPrev = new Set<number>();
   broSpawnTimerMs = 60_000;
   hqId = -1;
 
@@ -171,7 +204,7 @@ export class World {
     this.map = opts.map;
     this.feeds = opts.feeds;
     this.rng = opts.rng ?? new Rng(opts.seed);
-    this.capital = opts.startCapital ?? BASE_CAPITAL_CAP;
+    this.capital = opts.startCapital ?? STARTING_CAPITAL;
     this.impactW = Math.ceil(this.map.w / IMPACT_CELL);
     this.impactH = Math.ceil(this.map.h / IMPACT_CELL);
     this.impact = new Float32Array(this.impactW * this.impactH);
@@ -210,6 +243,23 @@ export class World {
     let vaults = 0;
     for (const e of this.entities.values()) if (e.kind === "vault") vaults++;
     return BASE_CAPITAL_CAP + vaults * VAULT_CAPACITY + this.tech.vaultCapLvl * VAULT_CAPACITY;
+  }
+
+  /** Swap the working sets at the start of each tick (no allocation). */
+  rollWorking(): void {
+    const t = this.workingPrev;
+    this.workingPrev = this.working;
+    this.working = t;
+    this.working.clear();
+  }
+
+  workedLastTick(id: number): boolean {
+    return this.workingPrev.has(id);
+  }
+
+  logEvent(msg: string): void {
+    this.timeline.push({ t: this.timeMs, msg });
+    if (this.timeline.length > 200) this.timeline.shift();
   }
 
   /** Point the Research Desk at a tech; resets progress on change. */
@@ -270,7 +320,7 @@ export class World {
         e.miner = { output: createBuffer(4), rateAcc: 0 };
         break;
       case "funding":
-        e.funding = { input: createBuffer(8), fuelAcc: 0 };
+        e.funding = { input: createBuffer(24), selling: null };
         break;
       case "belt":
         e.belt = { dir: "E", speed: 1.5, items: [] };
@@ -326,11 +376,20 @@ export class World {
     this.capital -= cost;
     this.entities.delete(id);
     this.hired += 1;
+    this.hiresByType[e.bro!.type] += 1;
+    if (this.hired % 50 === 0) this.logEvent(`HIRED ${this.hired}`);
     return true;
   }
 
-  removeEntity(id: number): void {
+  /** Demolish a non-HQ entity, refunding half the build cost. HQ is permanent. */
+  removeEntity(id: number): boolean {
+    const e = this.entities.get(id);
+    if (!e || e.kind === "hq") return false;
     this.entities.delete(id);
+    if (e.kind !== "bro") {
+      this.capital = Math.min(this.capitalCapacity(), this.capital + Math.round(COSTS[e.kind] * 0.5));
+    }
+    return true;
   }
 
   entityAt(tx: number, ty: number): Entity | null {
@@ -346,7 +405,12 @@ export class World {
     if (!e || e.hp === undefined) return false;
     e.hp -= dmg;
     if (e.hp <= 0) {
-      if (e.kind === "hq") this.state = "lost";
+      if (e.kind === "bro") this.brosKilled++;
+      if (e.kind === "hq") {
+        this.state = "lost";
+        this.lossReason = "hq";
+        this.logEvent("HQ OVERRUN");
+      }
       this.entities.delete(id);
       return true;
     }
@@ -367,9 +431,12 @@ export class World {
       });
     }
     this.powered = computePowered(powerList, POWER_RANGE);
+    // Only entities that actually worked (plus always-on defence/roadshow)
+    // are billed, so an idle base costs nothing.
     let demand = 0;
     for (const e of this.entities.values()) {
       if (!this.powered.has(e.id)) continue;
+      if (!ALWAYS_ON[e.kind] && !this.workedLastTick(e.id)) continue;
       demand += burnOf(e);
     }
     this.demandPerSec = demand;

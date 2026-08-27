@@ -5,15 +5,23 @@
  * Order: power → demand/multiplier → funding (capital in) → burn (capital
  * out) → miners → machines → belts → traders.
  */
-import { DX, DY, type Dir, type Entity, type World } from "./world";
-import { BRO_STATS, HIRE_QUOTA, IMPACT_CELL, ROADSHOW_ALPHA_NEEDED, burnOf, type BroType } from "./world";
+import { DX, DY, type Dir, type Entity, type EntityKind, type World } from "./world";
+import { BRO_STATS, HIRE_QUOTA, IMPACT_CELL, ROADSHOW_ALPHA_NEEDED, ROADSHOW_DELIVERY_PER_SEC, burnOf, type BroType } from "./world";
 import type { Item } from "./items";
-import { bufferAdd, bufferCount, bufferTake } from "./production";
+import { acceptsItem, bufferAdd, bufferCount, bufferTake, inputBufferOf, isTerminalSink, scaleFor, type Buffer } from "./production";
+import { sellableFuels } from "./recipes";
 import { TECH_BY_ID, applyTech } from "./research";
 
 export function tickWorld(w: World, dtMs: number): void {
   if (w.state !== "playing") return; // game over: freeze the sim
   w.timeMs += dtMs;
+  w.rollWorking(); // last tick's work set drives this tick's power bill
+  // 10 s P&L samples for the end-game curve; survives save/load, unlike
+  // a counter in the UI layer.
+  const lastSample = w.capHistory[w.capHistory.length - 1];
+  if (!lastSample || w.timeMs - lastSample.t >= 10_000) {
+    w.capHistory.push({ t: w.timeMs, capital: w.capital, alpha: w.totals.alpha });
+  }
   w.recomputePower();
   updateImpact(w, dtMs);
 
@@ -22,8 +30,10 @@ export function tickWorld(w: World, dtMs: number): void {
     if (e.kind === "funding") updateFunding(w, e, dtMs);
   }
 
-  // Burn: demand scales with the brownout multiplier.
-  w.capital = Math.max(0, w.capital - w.demandPerSec * (dtMs / 1000) * w.multiplier);
+  // Burn: the invoice is the invoice. Brownout throttles production, not the
+  // bill — scaling the bill by the multiplier made capital decay asymptotic
+  // and the margin call unreachable.
+  w.capital = Math.max(0, w.capital - w.demandPerSec * (dtMs / 1000));
   checkMarginCall(w, dtMs);
 
   for (const e of w.entities.values()) {
@@ -56,45 +66,65 @@ export function tickWorld(w: World, dtMs: number): void {
   updateBros(w, dtMs);
 }
 
+/**
+ * Sell the best unlocked fuel in the buffer (DESIGN.md §5.6). A desk holds
+ * whatever it is fed and pays for the richest kind it can actually burn.
+ */
 function updateFunding(w: World, e: Entity, dtMs: number): void {
   if (!w.powered.has(e.id)) return;
   const f = e.funding!;
-  const TIERS = [
-    { fuel: "clean", rate: 2, out: 40 },
-    { fuel: "signal", rate: 4, out: 160 },
-    { fuel: "alpha", rate: 2, out: 600 },
-  ] as const;
-  const tier = TIERS[Math.min(w.tech.fuelTier, TIERS.length - 1)]!;
-  const want = tier.rate * (dtMs / 1000);
-  const have = bufferCount(f.input, tier.fuel);
-  const availRatio = want > 0 ? Math.min(1, have / want) : 0;
-  f.fuelAcc += want;
-  const whole = Math.floor(f.fuelAcc);
-  const taken = Math.min(whole, have);
-  bufferTake(f.input, tier.fuel, taken);
-  f.fuelAcc -= taken;
-  // Production runs continuously at the fuel-availability ratio; integer
-  // consumption is just the bookkeeping rhythm.
-  w.capital = Math.min(w.capitalCapacity(), w.capital + tier.out * (dtMs / 1000) * availRatio);
+  const dt = dtMs / 1000;
+  const buf = f.input;
+  f.selling = null;
+  for (const fuel of sellableFuels(w.tech)) {
+    const want = fuel.ratePerSec * dt;
+    const have = bufferCount(buf, fuel.fuel);
+    if (have <= 0) continue;
+    const taken = Math.min(have, want);
+    bufferTake(buf, fuel.fuel, taken);
+    f.selling = fuel.fuel;
+    w.working.add(e.id);
+    w.capital = Math.min(w.capitalCapacity(), w.capital + fuel.capPerSec * dt * (taken / want));
+    return;
+  }
 }
+
+/**
+ * Tape a miner pulls per second at richness 1.0. `FeedPatch.richness` is a
+ * 1.0–2.2 yield *multiplier* (mapgen.ts), so a drill runs 4.0–8.8 tape/s —
+ * enough for one miner to feed a cleaner (1 tape/s) with room for a second
+ * lane, and still inside the ~15 items/s a belt lane carries (§5.2).
+ */
+const MINER_BASE_RATE = 4;
 
 function updateMiner(w: World, e: Entity, dtMs: number): void {
   if (!w.powered.has(e.id)) return;
   const m = e.miner!;
   const richness = w.feedAt(e.x, e.y)?.richness ?? 0;
   if (richness <= 0) return; // placed off-patch: idle (shouldn't happen; canPlace guards)
+  // Drain into belts first. A miner whose output has nowhere to go produces
+  // nothing — and banks nothing, so a jam cannot pay out a burst when it clears.
+  pushOutput(w, e, m.output, "tape");
+  if (m.output.total >= m.output.cap) {
+    m.rateAcc = 0;
+    return;
+  }
+  w.working.add(e.id);
   const speedMult = 1 + 0.25 * w.tech.minerSpeed;
   const yieldMult = 1 + 0.1 * w.tech.minerYield;
-  m.rateAcc += 1 * richness * yieldMult * speedMult * (dtMs / 1000) * w.multiplier;
+  m.rateAcc += MINER_BASE_RATE * richness * yieldMult * speedMult * (dtMs / 1000) * w.multiplier;
   while (m.rateAcc >= 1) {
-    if (bufferAdd(m.output, "tape", 1) === 0) break; // output full; hold the fraction
+    if (bufferAdd(m.output, "tape", 1) === 0) break;
     m.rateAcc -= 1;
     w.totals.tape += 1;
   }
-  // Push buffered tape onto adjacent belts; remainder waits for traders.
-  while (bufferCount(m.output, "tape") > 0 && pushToAdjacentBelt(w, e, "tape")) {
-    bufferTake(m.output, "tape", 1);
-  }
+  // Move fresh tape out the same tick it is mined.
+  pushOutput(w, e, m.output, "tape");
+}
+
+/** Move every unit of `item` from a buffer onto any adjacent belt. */
+function pushOutput(w: World, e: Entity, buf: Buffer, item: Item): void {
+  while (bufferCount(buf, item) > 0 && pushToAdjacentBelt(w, e, item)) bufferTake(buf, item, 1);
 }
 
 function updateMachine(w: World, e: Entity, dtMs: number): void {
@@ -104,16 +134,19 @@ function updateMachine(w: World, e: Entity, dtMs: number): void {
   // Research desks idle without a target; machines scale with tech speed.
   if (crafter.recipe.id === "research" && !w.researchTarget) return;
   const speedMult = machineSpeedMult(w, e);
+  const scale = scaleFor(e.kind, w.tech);
   const wasCrafting = crafter.crafting;
-  crafter.tick(dtMs * speedMult, mult);
+  crafter.tick(dtMs * speedMult, mult, scale);
+  if (powered && crafter.crafting && !crafter.blocked) w.working.add(e.id);
+  const produced = crafter.takeProduced();
   if (crafter.recipe.id === "research") {
     if (!wasCrafting && crafter.crafting) {
       e.researchTarget = w.researchTarget;
     }
-    if (wasCrafting && !crafter.crafting && e.researchTarget) {
-      const target = e.researchTarget!;
+    if (produced && e.researchTarget) {
+      const target = e.researchTarget;
       e.researchTarget = null;
-      if (target && !w.researched.has(target)) {
+      if (!w.researched.has(target)) {
         w.researchPoints += 1;
         const def = TECH_BY_ID.get(target);
         if (def && w.researchPoints >= def.cost) {
@@ -124,10 +157,10 @@ function updateMachine(w: World, e: Entity, dtMs: number): void {
       }
     }
   }
-  if (wasCrafting && !crafter.crafting) {
-    // Craft completed: move outputs onto adjacent belts; remainder stays in
-    // the output buffer for traders.
-    for (const [item, qty] of Object.entries(crafter.recipe.out)) {
+  if (produced) {
+    // Credit only what was actually made, then move it onto adjacent belts;
+    // the remainder waits in the output buffer for traders.
+    for (const [item, qty] of Object.entries(produced)) {
       w.totals[item as Item] += qty!;
       for (let i = 0; i < qty!; i++) {
         if (!pushToAdjacentBelt(w, e, item as Item)) break;
@@ -197,10 +230,10 @@ function tryBeltExit(w: World, e: Entity, it: { item: Item }): boolean {
     }
     return false;
   }
-  if (next.machine) {
-    return bufferAdd(next.machine.crafter.input, it.item, 1) > 0;
-  }
-  return false;
+  const buf = inputBufferOf(next);
+  if (!buf || !acceptsItem(next, it.item, w.tech)) return false;
+  // A full terminal sink writes surplus off rather than blocking the lane.
+  return bufferAdd(buf, it.item, 1) > 0 || isTerminalSink(next);
 }
 
 function beltTailRoom(e: Entity): boolean {
@@ -209,7 +242,13 @@ function beltTailRoom(e: Entity): boolean {
   return items[0]!.pos >= BELT_SPACING;
 }
 
-/** Push one item from a machine/miner output onto any adjacent belt (E,S,W,N). Returns true if placed. */
+/**
+ * Push one item from a machine/miner output onto an adjacent belt that leads
+ * away from the machine (§5.2). A belt facing the machine is an input lane:
+ * output dropped there can never be delivered — the machine rejects its own
+ * product, the item parks at the lane head and blocks everything behind it,
+ * which dead-locks the whole line.
+ */
 function pushToAdjacentBelt(w: World, e: Entity, item: Item): boolean {
   const sides: Dir[] = ["E", "S", "W", "N"];
   for (const dir of sides) {
@@ -217,10 +256,11 @@ function pushToAdjacentBelt(w: World, e: Entity, item: Item): boolean {
     const nx = dir === "E" ? e.x + e.w : dir === "W" ? e.x - 1 : e.x;
     const ny = dir === "S" ? e.y + e.h : dir === "N" ? e.y - 1 : e.y;
     const b = w.entityAt(nx, ny);
-    if (b?.kind === "belt" && beltTailRoom(b)) {
-      beltPush(b, item, 0);
-      return true;
-    }
+    if (b?.kind !== "belt" || !beltTailRoom(b)) continue;
+    const run = b.belt!;
+    if (DX[run.dir] === -DX[dir] && DY[run.dir] === -DY[dir]) continue;
+    beltPush(b, item, 0);
+    return true;
   }
   return false;
 }
@@ -242,9 +282,16 @@ function updateTrader(w: World, e: Entity, dtMs: number): void {
   let destOk = false;
   if (dest) {
     if (dest.kind === "belt") destOk = beltTailRoom(dest);
-    else if (dest.machine) destOk = dest.machine.crafter.input.total < dest.machine.crafter.input.cap;
+    else {
+      const b = inputBufferOf(dest);
+      destOk = !!b && b.total < b.cap;
+    }
   }
   if (!destOk) return;
+
+  // Only pick up what the destination will actually accept — anything else
+  // would be destroyed on delivery.
+  const wants = (it: Item): boolean => dest!.kind === "belt" || acceptsItem(dest!, it, w.tech);
 
   // Source: adjacent tile in the arm direction.
   const src = w.entityAt(e.x + DX[t.dir], e.y + DY[t.dir]);
@@ -253,14 +300,14 @@ function updateTrader(w: World, e: Entity, dtMs: number): void {
     if (src.kind === "belt") {
       const items = src.belt!.items;
       const front = items[items.length - 1];
-      if (front && front.pos >= PICKUP_POS) {
+      if (front && front.pos >= PICKUP_POS && wants(front.item)) {
         items.pop();
         item = front.item;
       }
     } else if (src.machine) {
       const out = src.machine.crafter.output;
       for (const [it, qty] of Object.entries(out.items)) {
-        if (qty! > 0) {
+        if (qty! > 0 && wants(it as Item)) {
           bufferTake(out, it as Item, 1);
           item = it as Item;
           break;
@@ -269,11 +316,10 @@ function updateTrader(w: World, e: Entity, dtMs: number): void {
     }
   }
   if (!item) return;
-  if (!dest) return;
-  if (dest.kind === "belt") {
-    beltPush(dest, item, 0);
-  } else if (dest.machine) {
-    bufferAdd(dest.machine.crafter.input, item, 1);
+  if (dest!.kind === "belt") {
+    beltPush(dest!, item, 0);
+  } else {
+    bufferAdd(inputBufferOf(dest!)!, item, 1);
   }
   t.cooldownMs = 2_000 / (1 + 0.25 * w.tech.traderSpeed);
   t.busyMs = TRADER_SWING_MS;
@@ -286,6 +332,8 @@ const IMPACT_DECAY = 0.98;
 // Decay + 4-way spread must sum < 1 per tick or the field amplifies to
 // infinity (0.98 + 4×0.004 = 0.996).
 const IMPACT_SPREAD = 0.004;
+/** Fraction of emitted impact that permanently saturates the market. */
+const EVOLUTION_PER_IMPACT = 7e-5;
 
 function updateImpact(w: World, dtMs: number): void {
   const sec = dtMs / 1000;
@@ -299,7 +347,10 @@ function updateImpact(w: World, dtMs: number): void {
     const idx = cy * w.impactW + cx;
     const added = burn * IMPACT_EMIT_PER_BURN * sec;
     w.impact[idx] = (w.impact[idx] ?? 0) + added;
-    w.evolution = Math.min(1, w.evolution + added * 5e-5);
+    // Market saturation tracks the fund's footprint: a 300 $/s burn base
+    // reaches half saturation in ~8 minutes, which is the pacing the
+    // 250-hire quota and the wave meter above are tuned against.
+    w.evolution = Math.min(1, w.evolution + added * EVOLUTION_PER_IMPACT);
   }
   // diffuse + decay (new array per tick; 4k floats — fine at 30 Hz)
   const src = w.impact;
@@ -320,8 +371,16 @@ function updateImpact(w: World, dtMs: number): void {
 
 // ── Finance bros ─────────────────────────────────────────────────────────────
 
-const BRO_CAP_BASE = 40;
+/** Ceiling on the field at full market saturation (× 0.5 + evolution). */
+const BRO_CAP_BASE = 24;
 
+/**
+ * Bro arrivals (DESIGN.md §5.7). The fund has to be able to afford them: a
+ * wave of 10 every 8 s at saturation is ~75/min, and hiring 250 of them is
+ * the win condition, so arrivals are metered to ~3/min cold and ~24/min at
+ * full saturation — roughly 400 across a 25 minute run, which leaves room to
+ * hire 250 and let compliance cull the rest.
+ */
 function spawnBros(w: World, dtMs: number): void {
   w.broSpawnTimerMs -= dtMs;
   if (w.broSpawnTimerMs > 0) return;
@@ -331,12 +390,17 @@ function spawnBros(w: World, dtMs: number): void {
     w.broSpawnTimerMs = 10_000;
     return;
   }
-  const n = Math.min(1 + Math.floor(w.evolution * 6), cap - broCount);
+  const n = Math.min(1 + Math.floor(w.evolution * 3), cap - broCount);
+  let spawned = 0;
   for (let i = 0; i < n; i++) {
     const spot = edgeSpot(w);
-    if (spot) w.spawnBro(broTypeFor(w), spot.x, spot.y);
+    if (spot && w.spawnBro(broTypeFor(w), spot.x, spot.y)) spawned++;
   }
-  w.broSpawnTimerMs = Math.max(20_000, 50_000 - w.evolution * 25_000);
+  if (spawned > 0) {
+    w.waves += 1;
+    w.logEvent(`WAVE ${w.waves} · ${spawned} BROS`);
+  }
+  w.broSpawnTimerMs = Math.max(4_000, 20_000 - w.evolution * 10_000);
 }
 
 function countBros(w: World): number {
@@ -353,7 +417,8 @@ function broTypeFor(w: World): BroType {
   return "trader";
 }
 
-function edgeSpot(w: World): { x: number; y: number } | null {
+/** A random map-edge tile clear of obstacles — where market stress walks in from. */
+export function edgeSpot(w: World): { x: number; y: number } | null {
   for (let tries = 0; tries < 20; tries++) {
     const side = w.rng.int(0, 3);
     let tx = 0;
@@ -376,6 +441,9 @@ function edgeSpot(w: World): { x: number; y: number } | null {
   return null;
 }
 
+/** Structures a bro will attack: the office, and whatever shoots at it. */
+const BRO_TARGETS: Partial<Record<EntityKind, true>> = { hq: true, tower: true };
+
 function updateBros(w: World, dtMs: number): void {
   for (const e of [...w.entities.values()]) {
     if (e.kind === "bro") updateBro(w, e, dtMs);
@@ -387,12 +455,13 @@ function updateBro(w: World, e: Entity, dtMs: number): void {
   const stats = BRO_STATS[b.type];
   const sec = dtMs / 1000;
 
-  // Attack the nearest combat entity if adjacent.
+  // Bros march on the office. Only the office and the towers defending it
+  // take damage (§5.8) — production out in the field is not a target, or the
+  // fund would be punished for building anywhere the towers cannot reach.
   let target: Entity | null = null;
   let bestD = Infinity;
   for (const other of w.entities.values()) {
-    // Bros never target each other — they raid structures.
-    if (other.id === e.id || other.hp === undefined || other.kind === "bro") continue;
+    if (other.id === e.id || other.hp === undefined || !BRO_TARGETS[other.kind]) continue;
     const d = distTiles(e, other);
     if (d < bestD) {
       bestD = d;
@@ -521,7 +590,7 @@ function updateRoadshow(w: World, e: Entity, dtMs: number): void {
   if (w.hired < HIRE_QUOTA) return;
   const r = e.roadshow!;
   const before = Math.floor(r.progress);
-  r.progress += (4 * dtMs) / 1000; // 4 alpha/s delivery rate
+  r.progress += ROADSHOW_DELIVERY_PER_SEC * (dtMs / 1000);
   if (Math.floor(r.progress) > before) {
     if (bufferCount(e.input!, "alpha") <= 0) {
       r.progress = before; // no fuel: hold progress
@@ -535,7 +604,11 @@ function updateRoadshow(w: World, e: Entity, dtMs: number): void {
 function checkMarginCall(w: World, dtMs: number): void {
   if (w.capital <= 0) {
     w.marginCallMs += dtMs;
-    if (w.marginCallMs >= 10_000) w.state = "lost";
+    if (w.marginCallMs >= 10_000) {
+      w.state = "lost";
+      w.lossReason = "margin";
+      w.logEvent("MARGIN CALL");
+    }
   } else {
     w.marginCallMs = 0;
   }

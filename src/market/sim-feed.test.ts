@@ -58,4 +58,37 @@ describe("SimFeed", () => {
     const cold = frames(OPTS, 600, 100);
     expect(cold.filter((f) => f.ch === "liq").length).toBeLessThan(10);
   });
+
+  it("liq notional equals price × qty from a single draw", () => {
+    const liqs = frames({ seed: 5, liqPerMin: 60 }, 1200, 100).filter((f) => f.ch === "liq"); // 120s
+    expect(liqs.length).toBeGreaterThan(10);
+    for (const f of liqs) {
+      if (f.ch !== "liq") continue;
+      expect(f.event.notional_usd).toBe(f.event.price * f.event.qty);
+    }
+  });
+
+  it("every frame carries a realistic exchange timestamp", () => {
+    const floor = Date.UTC(2020, 0, 1);
+    for (const f of frames(OPTS, 1200, 100)) {
+      const ts =
+        f.ch === "candle" ? f.bar.t
+        : f.ch === "cvd" ? f.bucket.t
+        : f.ch === "liq" ? f.event.t
+        : f.ts_ms;
+      expect(ts).toBeGreaterThan(floor);
+      if (f.ch === "cvd") expect(f.bucket.session_start_ms).toBeGreaterThan(floor);
+    }
+  });
+
+  it("funding_hourly is bucketed, not re-rolled on every ctx frame", () => {
+    const funding: number[] = [];
+    for (const f of frames(OPTS, 1200, 100)) {
+      if (f.ch === "ctx" && f.coin === "BTC" && funding.length < 100) funding.push(f.funding_hourly);
+    }
+    expect(funding.length).toBe(100);
+    let repeats = 0;
+    for (let i = 1; i < funding.length; i++) if (funding[i] === funding[i - 1]) repeats++;
+    expect(repeats).toBeGreaterThan(0);
+  });
 });

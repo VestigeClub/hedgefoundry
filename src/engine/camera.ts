@@ -53,4 +53,18 @@ export class Camera {
     const y1 = Math.ceil((this.y + this.viewH / this.zoom) / tileSize);
     return { x0, y0, x1, y1 };
   }
+
+  /** Center the view on a world-pixel point. */
+  centerOn(wx: number, wy: number): void {
+    this.x = wx - this.viewW / (2 * this.zoom);
+    this.y = wy - this.viewH / (2 * this.zoom);
+  }
+
+  /** Keep the view inside the world rect (allows a half-view slack on tiny maps). */
+  clampTo(worldW: number, worldH: number): void {
+    const vw = this.viewW / this.zoom;
+    const vh = this.viewH / this.zoom;
+    this.x = clamp(this.x, -vw / 2, Math.max(-vw / 2, worldW - vw / 2));
+    this.y = clamp(this.y, -vh / 2, Math.max(-vh / 2, worldH - vh / 2));
+  }
 }

@@ -25,25 +25,30 @@ export const BUILD_ORDER: BuildDef[] = [
   { kind: "roadshow", key: "g", label: "ROADSHOW" },
 ];
 
-// Input stores KeyboardEvent.code — map display keys to codes.
-const KEY_TO_KIND = new Map<string, EntityKind>([
-  ["Digit1", "miner"],
-  ["Digit2", "cleaner"],
-  ["Digit3", "analytics"],
-  ["Digit4", "factory"],
-  ["Digit5", "printer"],
-  ["Digit6", "research"],
-  ["Digit7", "funding"],
-  ["Digit8", "vault"],
-  ["Digit9", "link"],
-  ["Digit0", "belt"],
-  ["KeyQ", "trader"],
-  ["KeyE", "tower"],
-  ["KeyG", "roadshow"],
-]);
+// Input stores KeyboardEvent.code — map display keys to build kinds.
+const KEY_TO_KIND: Record<string, EntityKind> = {
+  Digit1: "miner",
+  Digit2: "cleaner",
+  Digit3: "analytics",
+  Digit4: "factory",
+  Digit5: "printer",
+  Digit6: "research",
+  Digit7: "funding",
+  Digit8: "vault",
+  Digit9: "link",
+  Digit0: "belt",
+  KeyQ: "trader",
+  KeyE: "tower",
+  KeyG: "roadshow",
+};
+
+/** Pairs for the per-frame key scan, materialised once (no hot-path allocation). */
+const KEY_BINDINGS = Object.entries(KEY_TO_KIND);
 
 export interface BuildCallbacks {
   onSelect(e: Entity | null): void;
+  onPlace(e: Entity): void;
+  onDeny(): void;
   toast(msg: string): void;
 }
 
@@ -52,6 +57,9 @@ export class BuildController {
   rotate = 0;
   private prevLeft = false;
   private prevRight = false;
+  /** Keys held last frame — build keys are edge-triggered (a held key must not
+   * toggle the tool once per frame). */
+  private readonly prevKeys = new Set<string>();
 
   constructor(
     private readonly world: World,
@@ -64,7 +72,11 @@ export class BuildController {
       const btn = document.createElement("button");
       btn.className = "build-btn";
       btn.innerHTML = `<span class="key">${b.key.toUpperCase()}</span><span class="lbl">${b.label}</span><span class="cost">$${fmtCost(COSTS[b.kind])}</span>`;
-      btn.addEventListener("click", () => this.setTool(b.kind));
+      btn.addEventListener("click", () => {
+        this.setTool(b.kind);
+        // Drop focus so number hotkeys keep working after a toolbar click.
+        btn.blur();
+      });
       this.bar.appendChild(btn);
     }
   }
@@ -78,13 +90,10 @@ export class BuildController {
   update(): void {
     const left = this.input.mouse.left;
     const right = this.input.mouse.right;
-    for (const [key, kind] of KEY_TO_KIND) {
-      if (this.input.keys.has(key)) {
-        this.setTool(kind);
-      }
-    }
-    if (this.input.keys.has("KeyR")) this.rotate++;
-    if (this.input.keys.has("Escape")) {
+    const pressed = (code: string): boolean => this.input.keys.has(code) && !this.prevKeys.has(code);
+    for (const [key, kind] of KEY_BINDINGS) if (pressed(key)) this.setTool(kind);
+    if (pressed("KeyR")) this.rotate++;
+    if (pressed("Escape") && this.tool) {
       this.tool = null;
       this.syncBar();
     }
@@ -95,6 +104,7 @@ export class BuildController {
       if (this.tool) {
         const err = this.world.canPlace(this.tool, tx, ty);
         if (err) {
+          this.cb.onDeny();
           this.cb.toast(`${this.tool.toUpperCase()}: ${err}`);
         } else {
           const e = this.world.placeEntity(this.tool, tx, ty)!;
@@ -104,6 +114,7 @@ export class BuildController {
             if (e.belt) e.belt.dir = next;
             else if (e.trader) e.trader.dir = next;
           }
+          this.cb.onPlace(e);
           this.cb.onSelect(e);
         }
       } else {
@@ -113,6 +124,8 @@ export class BuildController {
     }
     this.prevLeft = left;
     this.prevRight = right;
+    this.prevKeys.clear();
+    for (const k of this.input.keys) this.prevKeys.add(k);
   }
 
   hoverTile(): { tx: number; ty: number } {
@@ -137,6 +150,20 @@ export class BuildController {
     ctx.beginPath();
     ctx.roundRect(x, y, s * z, s * z, 3);
     ctx.fill();
+    ctx.stroke();
+  }
+
+  /** Hover outline on the tile under the cursor when no tool is armed. */
+  drawHover(ctx: CanvasRenderingContext2D): void {
+    if (this.tool) return;
+    const { tx, ty } = this.hoverTile();
+    const z = TILE_SIZE * this.camera.zoom;
+    const x = (tx * TILE_SIZE - this.camera.x) * this.camera.zoom;
+    const y = (ty * TILE_SIZE - this.camera.y) * this.camera.zoom;
+    ctx.strokeStyle = "rgba(0,200,255,0.35)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(x, y, z, z, 3);
     ctx.stroke();
   }
 

@@ -3,7 +3,7 @@ import { generateMap } from "../world/mapgen";
 import { tickWorld } from "./update";
 import { World, type EntityKind } from "./world";
 import { bufferAdd } from "./production";
-import { serializeWorld, deserializeWorld } from "./save";
+import { serializeWorld, deserializeWorld, mapFromSave } from "./save";
 
 const DT = 33.3333;
 const MAP_OPTS = { width: 128, height: 128, seed: 7, startClearRadius: 14, poolClusters: 25 };
@@ -61,6 +61,12 @@ describe("save/load", () => {
     expect(b.hired).toBe(a.hired);
     expect(b.hqId).toBe(a.hqId);
     expect(Array.from(b.impact)).toEqual(Array.from(a.impact));
+    expect(b.lossReason).toBe(a.lossReason);
+    expect(b.brosKilled).toBe(a.brosKilled);
+    expect(b.hiresByType).toEqual(a.hiresByType);
+    expect(b.waves).toBe(a.waves);
+    expect(b.timeline).toEqual(a.timeline);
+    expect(b.capHistory).toEqual(a.capHistory);
 
     // Per-entity internals survive.
     for (const [id, ea] of a.entities) {
@@ -86,11 +92,23 @@ describe("save/load", () => {
     expect(b.timeMs).toBe(a.timeMs);
     expect(b.totals).toEqual(a.totals);
     expect(Array.from(b.impact)).toEqual(Array.from(a.impact));
-    expect(b.rng.state()).toBe(a.rng.state());
+    expect(b.brosKilled).toBe(a.brosKilled);
+    expect(b.waves).toBe(a.waves);
+    expect(b.timeline).toEqual(a.timeline);
   });
 
   it("rejects unknown versions", () => {
     expect(() => deserializeWorld('{"v":99}')).toThrow(/version/);
+  });
+
+  it("refuses v1 saves", () => {
+    // v2 added the report stats; a v1 payload has no lossReason/timeline to
+    // restore, so it is refused rather than half-loaded.
+    const raw = JSON.parse(serializeWorld(buildWorld(), MAP_OPTS)) as { v: number };
+    raw.v = 1;
+    const v1 = JSON.stringify(raw);
+    expect(() => deserializeWorld(v1)).toThrow(/unsupported version 1/);
+    expect(() => mapFromSave(v1)).toThrow(/unsupported version 1/);
   });
 
   it("saves bros, towers, and roadshow state", () => {
@@ -123,5 +141,49 @@ describe("save/load", () => {
     expect(tb.input!.items.brief).toBe(3);
     const bros = [...b.entities.values()].filter((e) => e.kind === "bro");
     expect(bros.length).toBe(2);
+  });
+
+  it("round-trips the P3 report fields", () => {
+    const w = buildWorld();
+    const analyst = w.spawnBro("analyst", 30, 30)!;
+    expect(w.hireBro(analyst.id)).toBe(true);
+    const quant = w.spawnBro("quant", 31, 31)!;
+    expect(w.damageEntity(quant.id, 10_000)).toBe(true);
+    const hq = w.entities.get(w.hqId)!;
+    expect(w.damageEntity(hq.id, 10_000)).toBe(true); // → lossReason + timeline entry
+    w.waves = 4;
+    w.capHistory.push({ t: w.timeMs, capital: w.capital, alpha: w.totals.alpha });
+
+    const { world: b } = deserializeWorld(serializeWorld(w, MAP_OPTS));
+    expect(b.state).toBe("lost");
+    expect(b.lossReason).toBe("hq");
+    expect(b.brosKilled).toBe(1);
+    expect(b.hired).toBe(1);
+    expect(b.hiresByType).toEqual(w.hiresByType);
+    expect(b.hiresByType.analyst).toBe(1);
+    expect(b.waves).toBe(4);
+    expect(b.timeline).toEqual(w.timeline);
+    expect(b.timeline[b.timeline.length - 1]?.msg).toBe("HQ OVERRUN");
+    expect(b.capHistory).toEqual(w.capHistory);
+
+    // Restored arrays are copies, not aliases of the parsed payload.
+    b.logEvent("AFTER LOAD");
+    expect(w.timeline[w.timeline.length - 1]?.msg).not.toBe("AFTER LOAD");
+  });
+
+  it("round-trips the fuel a funding desk is selling", () => {
+    const w = buildWorld();
+    const desk = [...w.entities.values()].find((e) => e.kind === "funding")!;
+    expect(desk.funding!.selling).toBeNull(); // idle desk: null survives as null
+    desk.funding!.selling = "alpha"; // what updateFunding writes mid-tick
+
+    const { world: b } = deserializeWorld(serializeWorld(w, MAP_OPTS));
+    const restored = [...b.entities.values()].find((e) => e.kind === "funding")!;
+    expect(restored.funding!.selling).toBe("alpha");
+    expect(restored.funding!.input.items).toEqual(desk.funding!.input.items);
+
+    const idle = deserializeWorld(serializeWorld(buildWorld(), MAP_OPTS)).world;
+    const idleDesk = [...idle.entities.values()].find((e) => e.kind === "funding")!;
+    expect(idleDesk.funding!.selling).toBeNull();
   });
 });
