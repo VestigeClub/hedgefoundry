@@ -43,6 +43,13 @@ boundary, the full gate → commit again.
 - Never end a session with a dirty tree. Measured worst case: 42 dirty paths, no commit
   for five hours, gate red, and a `git diff` too scrambled to trust.
 - Commit messages use the existing style: `fix(sim): …`, `feat(ui): …`, `test(sim): …`.
+- **The index is shared between sessions.** `git add <paths>` then `git commit` commits
+  *everything staged*, not just your paths — a process-docs commit here swept in another
+  session's eight staged files. Check `git diff --cached --name-only` before, and
+  `git show --name-only HEAD` after, every commit.
+- **Never `--amend` or `reset` in a tree another session might commit to.** An amend meant
+  for my own commit landed on the sibling's and replaced its message (recovered only from
+  the reflog). Fix forward with a new commit instead.
 - Plan files in `.omp/plans/` carry a `Status:` line with the last commit hash and the
   next action. On resume, read `git log -1` plus that line — do not ask the user where
   the work stands.
