@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="HedgeFoundry">
+  <rect width="32" height="32" rx="5" fill="#0a0e14"/>
+  <path d="M4 23 L11 15 L16 19 L28 6" fill="none" stroke="#00e68c" stroke-width="3" stroke-linecap="square" stroke-linejoin="miter"/>
+  <path d="M22 6 h6 v6" fill="none" stroke="#00e68c" stroke-width="3" stroke-linecap="square"/>
+</svg>

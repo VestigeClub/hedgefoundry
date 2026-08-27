@@ -367,7 +367,7 @@ payback rows are measured by `src/sim/reachability.test.ts`, not estimated.
 - **Tuning method**: the Vitest harness plays scripted optimal money rules and
   asserts the ladder is net-positive and the quota payable.
 - **Open, measured, not hidden**: scripted play fills the 250-head quota and
-  survives the full 40 minutes but does not reach the IPO — research
+  survives a full 50-minute run but does not reach the IPO — research
   throughput (§5.5) is the binding constraint, and a plant that lets a sales
   desk buy the lab's own signal starves its tech tree. Fixing the economy
   route to the roadshow is the remaining balance work.
@@ -400,7 +400,7 @@ payback rows are measured by `src/sim/reachability.test.ts`, not estimated.
 - **Proven by simulation** (`src/sim/reachability.test.ts`): each production
   rung is net-positive (clean 2.0–2.6 k $/s on a ten-line farm, signal
   3.3–4.3 k $/s), and a scripted fund — build, defend, expand, hire — pays
-  its 250-head quota and holds the office for a full 40-minute run.
+  its 250-head quota and holds the office for a full 50-minute run.
 - **Open balance gap, recorded not hidden**: the same scripted fund never
   reaches the IPO. One research desk cannot feed its own two-ingredient recipe
   at the rate the tech route demands, so the run plateaus at fuel tier 1.

@@ -516,7 +516,7 @@ describe("win reachability", () => {
    * assertions cover the legs this script is measured to reach; the IPO leg
    * is proved separately below, because this script does not reach it.
    */
-  it("scripted play pays the quota and holds the office for 40 minutes", () => {
+  it("scripted play pays the quota and holds the office for 50 minutes", () => {
     const w = makeWorld();
     // Corners nearest the office first, richest as the tie-break. Ordering by
     // richness alone scattered the plant across a 256×256 map: cells landed

@@ -4,6 +4,15 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Factorio-style hedge fund factory game. Custom TS engine, web-first.",
+  "license": "MIT",
+  "homepage": "https://vestigeclub.github.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VestigeClub/hedgefoundry.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
