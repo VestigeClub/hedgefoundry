@@ -35,6 +35,22 @@ system; theme mapping §4 is law.
 5. Verify before claiming done: build + targeted tests, or a live run of
    the changed path.
 
+## Hard rules (each one is a measured failure)
+1. **Read, then patch, in the same turn.** Never reproduce file text from memory and
+   never invent a snapshot tag. Multi-function change, or a file you have not fully
+   read → rewrite the whole file.
+2. **Scoped check after every file change** (`npm run typecheck` +
+   `npx vitest run <file>`), full `npm run check` at boundaries — **unfiltered**.
+   Never pipe the gate through `grep`/`head`, never redirect output to a repo file.
+3. **Commit at every green check.** Never leave the tree dirty at session end. The
+   plan file carries `Status:` with the last commit hash and the next action.
+4. **The `bash` tool is POSIX bash**: bash syntax, forward slashes; PowerShell only
+   single-quoted. Any command handed to Zain is first verified against the installed
+   binary, with its shell named.
+
+Full mechanics — verification ladder, subagent file ownership, context budget, visual
+verification, harness limits, boundaries: **`docs/OPERATIONS.md`**. It is binding.
+
 ## Conventions
 - TypeScript strict mode. No `any`; no `@ts-ignore` without a comment.
 - Modules grouped by system; files under ~400 lines; hot paths

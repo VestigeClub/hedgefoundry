@@ -12,3 +12,4 @@ Thumbs.db
 src/**/_probe*.test.ts
 src/**/_scratch*.test.ts
 out*.txt
+arc*.txt
