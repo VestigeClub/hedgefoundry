@@ -4,8 +4,8 @@ Date: 2026-08-27. Baseline: `main` @ `e21150f` (pre-re-authoring; the same conte
 `5690a0f` on the current `main`), gate green (typecheck + 75 tests + build).
 Source: full audit of 2026-08-27 (47 numbered issues; issue numbers referenced below as `#N`).
 
-**Status (2026-08-27 23:35 UTC, HEAD `8c383e3`).** Gate green: typecheck clean, **123 tests /
-17 files**, build 65.69 kB (23.67 kB gz). Work landed out of the locked order, via the
+**Status (2026-08-27, late pass, standing on `2860bdc`).** Gate green: typecheck clean, **124 tests /
+17 files**, build 65.79 kB (23.71 kB gz). Work landed out of the locked order, via the
 concurrent implementation session: *"Fix three sim bugs that froze the factory, and rebalance
 the fuel ladder"* (belt→desk delivery, `acceptsItem` fuel/alpha branch, `rollWorking` call,
 `TECHS` restored to 16, `hireBro`, the `hp <= 0` guard → P1/P2 code) and *"Add the submission
@@ -15,13 +15,18 @@ already (see the re-authoring block below).
 **Not met, in order of consequence:** (1) the win route is still unproven — the scripted
 50-sim-minute arc samples `ipo=none, pts 4, tiers 2` at every point (`docs/BUILD_LOG.md:67-79`)
 and the earlier "IPO win verified live" claim was removed as false (`:89-91`), so P2/P3 are not
-done in the sense this plan means them; (2) P0 UI liveness has **zero** visual verification
-(browser device root-caused and fixed 23:0x UTC, still unexercised); (3) P6 publish is blocked
+done in the sense this plan means them; (2) ~~P0 UI liveness has **zero** visual verification~~
+— cleared: the shipped bundle was driven in a real browser across five playtest tasks with
+screenshot evidence, and the one task that failed produced the logged revision (see
+`docs/PLAYTEST.md`); (3) P6 publish is blocked
 on an owner decision, not on work: `main` and `origin/main` now share **no merge base** — 26
 local commits against 15 published, whose tip was `5690a0f` — so shipping means a force-push
-over the published branch, which also fires the Pages deploy.
-**Next action:** one `open` in a fresh session to clear the device claim, then the P2/P3 pass
-that makes the arc reach IPO — no rate tuning before that, per the ordering rule below.
+over the published branch, which also fires the Pages deploy; (4) P7 is half done — dates,
+granularity and the two reworded messages landed, but commit bodies and the agent-attribution
+trailer have not been written.
+**Next action:** owner call on the force-push and on private-vs-public (Pages from a private
+repo needs a paid plan), then the P2/P3 pass that makes the arc reach IPO — no rate tuning
+before that, per the ordering rule below.
 
 **History re-authored (2026-08-27 23:2x UTC, closes item 4).** All 22 commits rebuilt with
 `git commit-tree` plumbing (worktree and index untouched, so concurrent unstaged edits survived).

@@ -105,7 +105,9 @@ export class BuildController {
         const err = this.world.canPlace(this.tool, tx, ty);
         if (err) {
           this.cb.onDeny();
-          this.cb.toast(`${this.tool.toUpperCase()}: ${err}`);
+          const blocker = this.world.entityAt(tx, ty);
+          this.cb.toast(`${this.tool.toUpperCase()}: ${err}${blocker ? ` · ${blocker.kind.toUpperCase()} #${blocker.id}` : ""}`);
+          if (blocker) this.cb.onSelect(blocker);
         } else {
           const e = this.world.placeEntity(this.tool, tx, ty)!;
           if ((e.kind === "belt" || e.kind === "trader") && this.rotate % 4 !== 0) {

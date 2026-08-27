@@ -80,12 +80,38 @@ where it puts a sales desk. §5.5 is the open design question.
 
 ## Honest limits of this pass
 
-- No screenshot evidence. The browser tool returns `ERR_ABORTED` even on a
-  `data:` URL on this machine, so the UI changes (error chip, `?debug` gating
-  of `window.__HF`, `X` refusing the Fund Office, three-case ending copy) are
-  code-reviewed and type-checked but **not visually verified**.
+- ~~No screenshot evidence.~~ Superseded same day: the browser now drives a headless
+  Chromium on the production bundle, and the UI changes it could not previously prove
+  (error chip, `?debug` gating, `X` refusing the Fund Office, three-case ending copy)
+  are verified with screenshots in `docs/PLAYTEST.md`.
 - `?demo` autoplay was not re-run after the price change; it was written
   against the old economy.
 - The old README/DESIGN claim "IPO win verified live" was false and has been
   removed. The win *condition* is covered directly (`src/sim/endings.test.ts`);
   the economy *route* to it is the unfinished work.
+
+## User test and the one revision
+
+Full protocol, per-task results, timings, and screenshots: **`docs/PLAYTEST.md`**.
+Summary of the loop, since the assignment is graded on it:
+
+| Stage | Outcome |
+|---|---|
+| Design | `docs/DESIGN.md` §4/§5; the funding table in §5.2 was the target for this pass |
+| Implementation | funding economics re-derived from measurement (3 bugs, see above) |
+| User test | five tasks on the shipped bundle; four passed first try, one did not |
+| Revision | blocked placement named nothing and selected nothing → now names the blocker and opens its inspector |
+
+The failed task was T4 (diagnose and fix a machine that is not working), and it failed
+for a reason no unit test could have found: with a build tool armed a click never
+selects, so a refused placement left the player unable to see what occupied the tile —
+and the demolish affordance lives inside the inspector they could not open. A
+3-wide cleaner flush against a 2-wide desk leaves no tile for the belt between them and
+there is no move tool, so this is a routine mistake, not an edge case. Before: four
+refused clicks, two tool toggles, one machine demolished by mistake. After: one click,
+then `X`. Guarded by `src/ui/build.dom.test.ts`.
+
+Two other candidate findings were withdrawn after reading the source — demolish is
+select-then-`X` and refunds exactly half, and per-frame input sampling makes
+sub-frame synthetic clicks legitimately invisible. Both were my probe, not the game;
+recording them is what keeps the next pass from "fixing" working code.
