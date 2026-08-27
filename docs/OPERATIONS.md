@@ -27,8 +27,10 @@ body removed.
    hunks touch the same line.
 3. **Multi-function change, or a file you have not fully read → rewrite the whole file.**
    Read it complete, write it complete. Files here are 200–600 lines; a whole-file write
-   is cheaper than six repair rounds. This repo has already paid for that lesson once
-   (commit `eba229a`, "whitespace corruption from piecemeal edits").
+   is cheaper than six repair rounds. This repo paid for that lesson twice — see the
+   commits titled `chore: wholesale rewrite of update.ts`. **Cite commit subjects, not shas:**
+   history was re-authored on 2026-08-27 and every sha written before it changed (the shas in
+   this file were checked afterwards, not copied from a rewritten log).
 4. **After every file-level change, run the scoped check** (§3). No exceptions, including
    "obviously trivial" edits — the eight corruptions were all obviously trivial.
 5. **Data lists get an invariant test.** Anything where silent deletion is possible

@@ -3,19 +3,24 @@
 Date: 2026-08-27. Baseline: `main` @ `e21150f`, gate green (typecheck + 75 tests + build).
 Source: full audit of 2026-08-27 (47 numbered issues; issue numbers referenced below as `#N`).
 
-**Status (2026-08-27 23:25 UTC, HEAD `814aeb5`).** Gate green: typecheck clean, 117 tests /
-16 files, build 65.69 kB (23.67 kB gz). Work landed out of the locked order, via the
-concurrent implementation session: `904a78c` (belt→desk delivery, `acceptsItem` fuel/alpha
-branch, `rollWorking` call, `TECHS` restored to 16, `hireBro`, the `hp <= 0` guard, fuel-ladder
-rebalance → P1/P2 code) and `4ec3a83` (submission scaffold + Pages workflow → P6 partial).
+**Status (2026-08-27 23:35 UTC, HEAD `8c383e3`).** Gate green: typecheck clean, **123 tests /
+17 files**, build 65.69 kB (23.67 kB gz). Work landed out of the locked order, via the
+concurrent implementation session: *"Fix three sim bugs that froze the factory, and rebalance
+the fuel ladder"* (belt→desk delivery, `acceptsItem` fuel/alpha branch, `rollWorking` call,
+`TECHS` restored to 16, `hireBro`, the `hp <= 0` guard → P1/P2 code) and *"Add the submission
+scaffold and state the measured horizon honestly"* (→ P6 partial). Cite those subjects, not
+shas — history was re-authored after this line was first written and every sha moved once
+already (see the re-authoring block below).
 **Not met, in order of consequence:** (1) the win route is still unproven — the scripted
 50-sim-minute arc samples `ipo=none, pts 4, tiers 2` at every point (`docs/BUILD_LOG.md:67-79`)
 and the earlier "IPO win verified live" claim was removed as false (`:89-91`), so P2/P3 are not
 done in the sense this plan means them; (2) P0 UI liveness has **zero** visual verification
-(browser device fixed 23:0x UTC, unexercised); (3) P6 is unpushed, 6 commits ahead, and pushing
-publishes Pages; (4) P7 commit re-authoring untouched. **Next action:** one `open` in a fresh
-session to clear the device claim, then the P2/P3 pass that makes the arc reach IPO — no rate
-tuning before that, per the ordering rule below.
+(browser device root-caused and fixed 23:0x UTC, still unexercised); (3) P6 publish is blocked
+on an owner decision, not on work: `main` and `origin/main` now share **no merge base** — 26
+local commits against 15 published, whose tip was `5690a0f` — so shipping means a force-push
+over the published branch, which also fires the Pages deploy.
+**Next action:** one `open` in a fresh session to clear the device claim, then the P2/P3 pass
+that makes the arc reach IPO — no rate tuning before that, per the ordering rule below.
 
 **History re-authored (2026-08-27 23:2x UTC, closes item 4).** All 22 commits rebuilt with
 `git commit-tree` plumbing (worktree and index untouched, so concurrent unstaged edits survived).
