@@ -42,17 +42,22 @@ describe("data-table invariants", () => {
     for (const b of BUILD_ORDER) expect(b.key.length).toBe(1);
   });
 
-  it("every priced machine is reachable from the build bar", () => {
-    // The failure this exists for: a kind added to COSTS/SIZES with a price and no
-    // hotbar entry — legal TypeScript, and a machine the player can never place.
-    const onBar = index(BUILD_ORDER.map((b) => b.kind));
-    const pricedButUnplaceable = ALL_KINDS.filter((k) => COSTS[k] > 0 && !onBar[k]);
-    expect(pricedButUnplaceable).toEqual([]);
+  it("a kind is priced exactly when it is on the build bar", () => {
+    // Biconditional straight off the sim's table, so no {hq, bro} allowlist can rot:
+    // COSTS[kind] > 0 <=> kind is in BUILD_ORDER. Both directions are checked; combined
+    // with the uniqueness test above, two empty differences mean the sets are equal.
+    const barKinds = BUILD_ORDER.map((b) => b.kind); // unique, asserted above
+    const pricedKinds = ALL_KINDS.filter((k) => COSTS[k] > 0);
+    const onBar = index(barKinds);
+    const pricedNotOnBar = ALL_KINDS.filter((k) => COSTS[k] > 0 && !onBar[k]);
+    const onBarUnpriced = barKinds.filter((k) => !(COSTS[k] > 0));
+    expect(pricedNotOnBar, "priced in COSTS but not placeable").toEqual([]);
+    expect(onBarUnpriced, "on the build bar but not priced").toEqual([]);
+    // Explicit set equality over the whole COSTS key set — names both sides if it breaks.
+    expect([...barKinds].sort()).toEqual([...pricedKinds].sort());
   });
 
-  it("everything on the build bar is priced and occupies at least one tile", () => {
-    const unpriced = BUILD_ORDER.filter((b) => !(COSTS[b.kind] > 0)).map((b) => b.kind);
-    expect(unpriced).toEqual([]);
+  it("everything on the build bar occupies at least one tile", () => {
     const zeroFootprint = BUILD_ORDER.filter((b) => !(SIZES[b.kind] >= 1)).map((b) => b.kind);
     expect(zeroFootprint).toEqual([]);
   });
