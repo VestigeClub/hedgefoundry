@@ -4,7 +4,7 @@ Date: 2026-08-27. Baseline: `main` @ `e21150f` (pre-re-authoring; the same conte
 `5690a0f` on the current `main`), gate green (typecheck + 75 tests + build).
 Source: full audit of 2026-08-27 (47 numbered issues; issue numbers referenced below as `#N`).
 
-**Status (2026-08-27, late pass, standing on `2860bdc`).** Gate green: typecheck clean, **124 tests /
+**Status (2026-08-27, publish-ready pass, standing on `34625f8`).** Gate green: typecheck clean, **124 tests /
 17 files**, build 65.79 kB (23.71 kB gz). Work landed out of the locked order, via the
 concurrent implementation session: *"Fix three sim bugs that froze the factory, and rebalance
 the fuel ladder"* (belt→desk delivery, `acceptsItem` fuel/alpha branch, `rollWorking` call,
@@ -18,15 +18,14 @@ and the earlier "IPO win verified live" claim was removed as false (`:89-91`), s
 done in the sense this plan means them; (2) ~~P0 UI liveness has **zero** visual verification~~
 — cleared: the shipped bundle was driven in a real browser across five playtest tasks with
 screenshot evidence, and the one task that failed produced the logged revision (see
-`docs/PLAYTEST.md`); (3) P6 publish is blocked
-on an owner decision, not on work: `main` and `origin/main` now share **no merge base** — 26
-local commits against 15 published, whose tip was `5690a0f` — so shipping means a force-push
-over the published branch, which also fires the Pages deploy; (4) P7 is half done — dates,
-granularity and the two reworded messages landed, but commit bodies and the agent-attribution
-trailer have not been written.
-**Next action:** owner call on the force-push and on private-vs-public (Pages from a private
-repo needs a paid plan), then the P2/P3 pass that makes the arc reach IPO — no rate tuning
-before that, per the ordering rule below.
+`docs/PLAYTEST.md`); (3) P6 publish is blocked on an owner decision, not on work: `main` and
+`origin/main` share **no merge base** (29 local commits against 15 published, published tip
+`e21150f`), so shipping is a delete-and-recreate or a force-push; and
+(4) ~~commit bodies and the agent-attribution trailer have not been written~~ — **closed**: every
+commit now carries a real body and the `Assisted-by:` trailer, and the internal strings that lived
+in *file contents* (not just messages) have been scrubbed out of the 14 commits that carried them.
+**Next action:** owner runs the publish sequence below (public repo + Pages), then the P2/P3 pass
+that makes the arc reach IPO — no rate tuning before that, per the ordering rule below.
 
 **History re-authored (2026-08-27 23:2x UTC, closes item 4).** All 22 commits rebuilt with
 `git commit-tree` plumbing (worktree and index untouched, so concurrent unstaged edits survived).
@@ -41,6 +40,26 @@ noreply address; exactly two subjects differ from the old chain. Old chain prese
 reworded text. Rewriting pushed commits means the force-push in P6 is mandatory, not optional.
 Shas quoted above (`904a78c`, `4ec3a83`, `e21150f`) are pre-rewrite; the equivalents are
 `bf6868e`, `b1cf74a`, `5690a0f`.
+
+**Second history pass (2026-08-27 23:5x UTC) — content scrub + bodies + attribution.** The first
+pass reworded messages only; the internal product/host strings were also in *tracked file contents*
+of 14 commits (`AGENTS.md`, `README.md`, `docs/DESIGN.md`, `server/relay.mjs`, `src/market/types.ts`).
+All 29 commits were rebuilt again with `git commit-tree`, this time writing each revision into a
+scratch worktree, running `.scratch/scrub.mjs` over it, and re-adding before `write-tree`, so the
+old blobs are unreachable. The scrubber's rules take their wording from the replacements HEAD
+already made, so history converges on text the tip already uses.
+
+Verified, not assumed: `.scratch/gate.sh` rebuilds a known-dirty revision and **fails the pass
+unless the tree changes** (it did: `f505bb5a` → `c91545e7`), which proves the loop is live rather
+than a no-op; `git grep` for the internal tokens is empty in **all 29** trees; every commit message
+scores `residual_lines=0`; all 29 carry the trailer with a non-empty body; subjects, author dates
+and the single noreply author are unchanged from `pre-attn`; tip tree `50ebe4ce` identical, so the
+working tree never moved. Bodies came from 21 parallel readers, one per bodyless commit, each
+restricted to that commit's own diff.
+
+Backups: `.scratch/current-chain-backup.bundle` (main + tag `pre-attn`) and
+`.scratch/leaked-chain-archive.bundle` (the 21-commit chain that still carried the leak — deleted
+tag `pre-rewrite`, archived off-repo so no `--tags` push can ever publish it).
 
 ## Decisions (locked by owner)
 
