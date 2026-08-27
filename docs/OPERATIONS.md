@@ -32,8 +32,9 @@ body removed.
 4. **After every file-level change, run the scoped check** (§3). No exceptions, including
    "obviously trivial" edits — the eight corruptions were all obviously trivial.
 5. **Data lists get an invariant test.** Anything where silent deletion is possible
-   (`TECHS`, `LAB_DEFS`, machine kinds) needs a uniqueness/length assertion, so removal
-   fails loudly instead of quietly unbalancing the game.
+   (`TECHS` in `sim/research.ts:52`, `BUILD_ORDER` in `ui/build.ts:12`, `ITEMS`,
+   `DEFAULT_COINS`) needs a uniqueness/length assertion, so removal fails loudly instead of
+   quietly unbalancing the game. `TECHS` already has one (`research.test.ts:34`); the rest do not.
 
 ## 2. Milestones and commits
 
