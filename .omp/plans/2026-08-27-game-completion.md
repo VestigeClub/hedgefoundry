@@ -1,6 +1,7 @@
 # Plan 0001 — Make HedgeFoundry winnable, playable, and submittable
 
-Date: 2026-08-27. Baseline: `main` @ `e21150f`, gate green (typecheck + 75 tests + build).
+Date: 2026-08-27. Baseline: `main` @ `e21150f` (pre-re-authoring; the same content is
+`5690a0f` on the current `main`), gate green (typecheck + 75 tests + build).
 Source: full audit of 2026-08-27 (47 numbered issues; issue numbers referenced below as `#N`).
 
 **Status (2026-08-27 23:35 UTC, HEAD `8c383e3`).** Gate green: typecheck clean, **123 tests /
