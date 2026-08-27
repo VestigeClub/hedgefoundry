@@ -4,7 +4,7 @@ Date: 2026-08-27. Baseline: `main` @ `e21150f` (pre-re-authoring; the same conte
 `5690a0f` on the current `main`), gate green (typecheck + 75 tests + build).
 Source: full audit of 2026-08-27 (47 numbered issues; issue numbers referenced below as `#N`).
 
-**Status (2026-08-27, publish-ready pass, standing on `34625f8`).** Gate green: typecheck clean, **124 tests /
+**Status (2026-08-27, publish-ready pass, `main` tip; gate measured green at `0f2e95a`).** Typecheck clean, **124 tests /
 17 files**, build 65.79 kB (23.71 kB gz). Work landed out of the locked order, via the
 concurrent implementation session: *"Fix three sim bugs that froze the factory, and rebalance
 the fuel ladder"* (belt→desk delivery, `acceptsItem` fuel/alpha branch, `rollWorking` call,
@@ -35,11 +35,16 @@ from the pre-rebase objects still reachable via the reflog — the 08-25 session
 23:49:31, which is what the chain now shows. Two messages were reworded: `M2` named an internal
 product, `M6/M7` claimed "IPO win verified live" (false, see `docs/BUILD_LOG.md:89-91`). Verified:
 HEAD tree hash unchanged (`fe54a72e`), so zero content change; all 22 authors carry the GitHub
-noreply address; exactly two subjects differ from the old chain. Old chain preserved at tag
-`pre-rewrite` and `.scratch/pre-rewrite.bundle` — **never push that tag**, it still carries the
-reworded text. Rewriting pushed commits means the force-push in P6 is mandatory, not optional.
-Shas quoted above (`904a78c`, `4ec3a83`, `e21150f`) are pre-rewrite; the equivalents are
-`bf6868e`, `b1cf74a`, `5690a0f`.
+noreply address; exactly two subjects differ from the old chain. Rewriting pushed commits means the
+P6 push is a delete-and-recreate or a `--force-with-lease` (never bare `--force` — a sibling session
+that pushes first must make it fail, not get overwritten). Shas quoted above have now moved twice;
+current equivalents, each matched **by tree hash** rather than by narrative: `904a78c` → `fdfd2b1`,
+`4ec3a83` → `0f2a907`, and the published tip `e21150f` (same content as `5690a0f`) → `9c27165`.
+The superseded line is **no longer tagged** — tag `pre-rewrite` and `.scratch/pre-rewrite.bundle`
+from the earlier draft of this paragraph no longer exist; that chain lives only in
+`.scratch/leaked-chain-archive.bundle` (gitignored, off-repo). Every commit on it, including
+`58534da`, `7799e24`, `98e7395`, `814aeb5`, was then re-checked: each has an identical tree
+somewhere in the current chain, so no range choice during the rewrite dropped a commit.
 
 **Second history pass (2026-08-27 23:5x UTC) — content scrub + bodies + attribution.** The first
 pass reworded messages only; the internal product/host strings were also in *tracked file contents*
@@ -51,15 +56,16 @@ already made, so history converges on text the tip already uses.
 
 Verified, not assumed: `.scratch/gate.sh` rebuilds a known-dirty revision and **fails the pass
 unless the tree changes** (it did: `f505bb5a` → `c91545e7`), which proves the loop is live rather
-than a no-op; `git grep` for the internal tokens is empty in **all 29** trees; every commit message
-scores `residual_lines=0`; all 29 carry the trailer with a non-empty body; subjects, author dates
-and the single noreply author are unchanged from `pre-attn`; tip tree `50ebe4ce` identical, so the
-working tree never moved. Bodies came from 21 parallel readers, one per bodyless commit, each
-restricted to that commit's own diff.
+than a no-op; `git grep` for the internal tokens is empty in **every tree** of the chain; every
+commit message scores `residual_lines=0`; every commit — the 29 rebuilt ones and the docs commits
+added after the pass — carries the trailer with a non-empty body; subjects, author dates and the
+single noreply author are unchanged from `pre-attn`; and `git diff --name-only pre-attn HEAD` lists
+exactly one file (this plan), so 29 commits of content are byte-identical to the pre-rewrite tip.
+Bodies came from 21 parallel readers, one per bodyless commit, each restricted to that commit's own diff.
 
-Backups: `.scratch/current-chain-backup.bundle` (main + tag `pre-attn`) and
-`.scratch/leaked-chain-archive.bundle` (the 21-commit chain that still carried the leak — deleted
-tag `pre-rewrite`, archived off-repo so no `--tags` push can ever publish it).
+Backups, both `git bundle verify`-clean: `.scratch/current-chain-backup.bundle` (`main` + tag
+`pre-attn`) and `.scratch/leaked-chain-archive.bundle` (the pre-scrub chain, kept only as an
+off-repo archive — nothing references it by ref, so no `--tags` or `--follow-tags` push can publish it).
 
 ## Decisions (locked by owner)
 
