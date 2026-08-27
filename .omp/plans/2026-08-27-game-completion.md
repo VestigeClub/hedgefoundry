@@ -63,6 +63,16 @@ single noreply author are unchanged from `pre-attn`; and `git diff --name-only p
 exactly one file (this plan), so 29 commits of content are byte-identical to the pre-rewrite tip.
 Bodies came from 21 parallel readers, one per bodyless commit, each restricted to that commit's own diff.
 
+`.scratch/pairs.mjs` prints the pairing itself rather than asserting it: pairing all 29 `pre-attn`
+commits to their `HEAD` twins by author-date + subject gives **15 tree-identical pairs, 14 pairs with
+differing trees, 0 unmatched**, and every one of those 14 deltas touches only the five scrubbed paths
+(file counts 1–5, nothing outside them) — so the scrub is the whole explanation for every tree change.
+The same script sweeps the reflog: of 22 entries, 19 are not ancestors of `HEAD` and 17 of those have
+their exact tree in `HEAD`; the two that do not (`ad51e12`, and `e415f49` "placeholder") are
+amended-away predecessors whose content is present in `HEAD` — `.scratch/` convention at
+`docs/OPERATIONS.md:75`, the `browser.relay`-precedes-`browser.headless` root cause at `:183`/`:192`,
+and `deploy.yml` / `LICENSE` / `public/favicon.svg` / `docs/BUILD_LOG.md` all tracked. Nothing was lost.
+
 Backups, both `git bundle verify`-clean: `.scratch/current-chain-backup.bundle` (`main` + tag
 `pre-attn`) and `.scratch/leaked-chain-archive.bundle` (the pre-scrub chain, kept only as an
 off-repo archive — nothing references it by ref, so no `--tags` or `--follow-tags` push can publish it).
