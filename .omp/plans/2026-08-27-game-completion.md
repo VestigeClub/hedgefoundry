@@ -59,17 +59,19 @@ unless the tree changes** (it did: `f505bb5a` → `c91545e7`), which proves the 
 than a no-op; `git grep` for the internal tokens is empty in **every tree** of the chain; every
 commit message scores `residual_lines=0`; every commit — the 29 rebuilt ones and the docs commits
 added after the pass — carries the trailer with a non-empty body; subjects, author dates and the
-single noreply author are unchanged from `pre-attn`; and `git diff --name-only pre-attn HEAD` lists
-exactly one file (this plan), so 29 commits of content are byte-identical to the pre-rewrite tip.
+single noreply author are unchanged from `pre-attn`; and the rewrite itself changed **zero content at
+the tip** — `pre-attn^{tree}` and the rebuilt tip tree are both `50ebe4ce`. Per-commit the story is the
+15/14 split below: most revisions kept their tree exactly, 14 were rewritten by the scrub alone.
 Bodies came from 21 parallel readers, one per bodyless commit, each restricted to that commit's own diff.
 
 `.scratch/pairs.mjs` prints the pairing itself rather than asserting it: pairing all 29 `pre-attn`
 commits to their `HEAD` twins by author-date + subject gives **15 tree-identical pairs, 14 pairs with
 differing trees, 0 unmatched**, and every one of those 14 deltas touches only the five scrubbed paths
 (file counts 1–5, nothing outside them) — so the scrub is the whole explanation for every tree change.
-The same script sweeps the reflog: of 22 entries, 19 are not ancestors of `HEAD` and 17 of those have
-their exact tree in `HEAD`; the two that do not (`ad51e12`, and `e415f49` "placeholder") are
-amended-away predecessors whose content is present in `HEAD` — `.scratch/` convention at
+The same script sweeps the reflog (counts shift as post-pass commits land; final run: 23 entries,
+19 not ancestors of `HEAD`, 17 of those holding their exact tree in `HEAD`). The two that do not —
+`ad51e12` and `e415f49` "placeholder" — are amended-away predecessors whose content is present in `HEAD`:
+the `.scratch/` rule at
 `docs/OPERATIONS.md:75`, the `browser.relay`-precedes-`browser.headless` root cause at `:183`/`:192`,
 and `deploy.yml` / `LICENSE` / `public/favicon.svg` / `docs/BUILD_LOG.md` all tracked. Nothing was lost.
 
