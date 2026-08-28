@@ -18,14 +18,16 @@ and the earlier "IPO win verified live" claim was removed as false (`:89-91`), s
 done in the sense this plan means them; (2) ~~P0 UI liveness has **zero** visual verification~~
 — cleared: the shipped bundle was driven in a real browser across five playtest tasks with
 screenshot evidence, and the one task that failed produced the logged revision (see
-`docs/PLAYTEST.md`); (3) P6 publish is blocked on an owner decision, not on work: `main` and
-`origin/main` share **no merge base** (29 local commits against 15 published, published tip
-`e21150f`), so shipping is a delete-and-recreate or a force-push; and
+`docs/PLAYTEST.md`); (3) ~~P6 publish is blocked on an owner decision, not on work~~ — **shipped**:
+the private repo was deleted and recreated **public**, `main` pushed as the only ref (no tags), Pages
+set to `build_type=workflow`, and run #1 of `.github/workflows/deploy.yml` went green in 80 s;
 (4) ~~commit bodies and the agent-attribution trailer have not been written~~ — **closed**: every
 commit now carries a real body and the `Assisted-by:` trailer, and the internal strings that lived
 in *file contents* (not just messages) have been scrubbed out of the 14 commits that carried them.
-**Next action:** owner runs the publish sequence below (public repo + Pages), then the P2/P3 pass
-that makes the arc reach IPO — no rate tuning before that, per the ordering rule below.
+**Published (2026-08-28):** repo `github.com/VestigeClub/hedgefoundry` (public), game live at
+`https://vestigeclub.github.io/hedgefoundry/` — verified serving the built bundle and ticking in real
+time from the public URL. **Next action:** the P2/P3 pass that makes the arc reach IPO; no rate
+tuning before that, per the ordering rule below.
 
 **History re-authored (2026-08-27 23:2x UTC, closes item 4).** All 22 commits rebuilt with
 `git commit-tree` plumbing (worktree and index untouched, so concurrent unstaged edits survived).
