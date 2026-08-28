@@ -4,32 +4,38 @@ Date: 2026-08-27. Baseline: `main` @ `e21150f` (pre-re-authoring; the same conte
 `5690a0f` on the current `main`), gate green (typecheck + 75 tests + build).
 Source: full audit of 2026-08-27 (47 numbered issues; issue numbers referenced below as `#N`).
 
-**Status (2026-08-28, post-publish).** Last pushed tip: `237fd43`, CI green on that
-commit — typecheck clean, **124 tests /
-17 files**, build 65.79 kB (23.71 kB gz). Work landed out of the locked order, via the
-concurrent implementation session: *"Fix three sim bugs that froze the factory, and rebalance
-the fuel ladder"* (belt→desk delivery, `acceptsItem` fuel/alpha branch, `rollWorking` call,
-`TECHS` restored to 16, `hireBro`, the `hp <= 0` guard → P1/P2 code) and *"Add the submission
-scaffold and state the measured horizon honestly"* (→ P6 partial). Cite those subjects, not
-shas — history was re-authored after this line was first written and every sha moved once
-already (see the re-authoring block below).
-**Not met, in order of consequence:** (1) the win route is still unproven — the scripted
-50-sim-minute arc samples `ipo=none, pts 4, tiers 2` at every point (`docs/BUILD_LOG.md:67-79`)
-and the earlier "IPO win verified live" claim was removed as false (`:89-91`), so P2/P3 are not
-done in the sense this plan means them; (2) ~~P0 UI liveness has **zero** visual verification~~
-— cleared: the shipped bundle was driven in a real browser across five playtest tasks with
-screenshot evidence, and the one task that failed produced the logged revision (see
-`docs/PLAYTEST.md`); (3) ~~P6 publish is blocked on an owner decision, not on work~~ — **shipped**:
-the private repo was deleted and recreated **public**, `main` pushed as the only ref (no tags), Pages
-set to `build_type=workflow`, and run #1 of `.github/workflows/deploy.yml` went green in 80 s;
-(4) ~~commit bodies and the agent-attribution trailer have not been written~~ — **closed**: every
-commit now carries a real body and the `Assisted-by:` trailer, and the internal strings that lived
-in *file contents* (not just messages) have been scrubbed out of the 14 commits that carried them.
-**Published (2026-08-28):** repo `github.com/VestigeClub/hedgefoundry` (public), game live at
-`https://vestigeclub.github.io/hedgefoundry/` — verified serving the built bundle and ticking in real
-time from the public URL. **Next action:** the P2/P3 pass that makes the arc reach IPO,
-from `237fd43` onward; no rate tuning before that, per the ordering rule below. The commit
-that lands this line moves the tip, so `git log -1` stays authoritative over this number.
+**Status (2026-08-28, P2 closed in simulation).** Gate green — typecheck clean, **125 tests /
+17 files**, build 65.91 kB (23.74 kB gz); CI green on the last pushed tip. Work landed out of the
+locked order, via the concurrent implementation session: *"Fix three sim bugs that froze the
+factory, and rebalance the fuel ladder"* (belt→desk delivery, `acceptsItem` fuel/alpha branch,
+`rollWorking` call, `TECHS` restored to 16, `hireBro`, the `hp <= 0` guard → P1/P2 code), *"Add the
+submission scaffold and state the measured horizon honestly"* (→ P6 partial), and now *"Drain
+machine output every tick so the win route opens"* (→ P2, and the P3 win state with it). Cite those
+subjects, not shas — history was re-authored after this line was first written and every sha moved
+once already (see the re-authoring block below).
+**P2 met.** The scripted 50-sim-minute arc reports `state=won` at **20.6 min**: 251/250 hired,
+$299,710 in hand, all twelve techs, 18 miners / 12 analytics engines / 7 strategy factories, 563
+alpha made, 95 waves survived. What actually unlocked it was a delivery bug, not balance:
+`updateMachine` pushed a machine's output onto tape only on the tick a craft completed, so a single
+legal refusal — the research desk caps each ingredient at six units, so a seventh alpha is refused —
+stranded those units for the rest of the run, `blocked` never cleared, and the jam walked backwards
+until the desk starved holding half a recipe. `logistics.test.ts › retries a delivery the belt
+refused once the lane clears` holds the invariant and was verified to fail without the fix. The arc
+also needed two money rules a player can read off the panel: a ground budget (18 miner corners on
+this map, so the cheap rungs must not eat them all before FUEL TIER II) and a war chest ahead of the
+IPO ticket.
+**Still open, in order of consequence:** (1) M7 — no human hand has reached the win overlay in a
+browser and the cross-platform pass (MacBook Safari) has not been run; (2) P4 onboarding and
+legibility; (3) P5 market-feed wiring; (4) splitting the three oversized files
+(`reachability.test.ts`, `update.ts`, `world.ts`). Closed since this line was first written:
+~~P0 UI liveness~~ (five browser playtest tasks with screenshots, `docs/PLAYTEST.md`), ~~P6
+publish~~ (repo `github.com/VestigeClub/hedgefoundry` public, `main` the only ref, Pages deploying
+from Actions and live at `https://vestigeclub.github.io/hedgefoundry/`), ~~commit attribution~~
+(every commit carries a body and the `Assisted-by:` trailer, and the
+internal strings that lived in file contents were scrubbed out of the commits that carried them).
+**Next action:** P4, from the commit that lands this line; `git log -1` stays authoritative over any
+sha quoted here, and no rate tuning happens before a human playtest says the arc's money rules are
+not the game's.
 
 **History re-authored (2026-08-27 23:2x UTC, closes item 4).** All 22 commits rebuilt with
 `git commit-tree` plumbing (worktree and index untouched, so concurrent unstaged edits survived).
@@ -176,15 +182,20 @@ Everything else is untestable until a click does what it looks like.
   record the arithmetic in `docs/DESIGN.md` §5.7 so the doc and the number cannot drift again.
 - Bro supply: spawn cap must not be the binding constraint — tie cap to `researched` count and HQ
   size rather than to `evolution` alone, so a clean player is not punished (`#21`).
-- New permanent tests (`src/sim/economy.test.ts`):
-  - `starter line is net positive after 90 s`;
-  - `funding T1 nets >= 60 $/s when fuelled`;
-  - `250 hires affordable within 50 min of scripted optimal play` — **met**, 473/250 by the 20th
-    minute (`docs/BUILD_LOG.md`); (drives `tickWorld` directly, no
-    DOM, deterministic seed, < 5 s runtime).
+- Permanent tests: `src/sim/economy.test.ts` was never created. The same three contracts live in
+  `reachability.test.ts` — the parametrised `ten <rung> lines carry the fund's margin` cases (clean
+  2.0–2.6 k $/s, signal 3.3–4.3 k $/s, no brownout) and the arc itself, which cannot win without
+  paying the 250-head quota. An older note here quoted "473/250 by the 20th minute"; that arc hired
+  past quota, which the win condition does not ask for and which starves the IPO ticket — the
+  current arc stops at 251/250. All of it drives `tickWorld` directly: no DOM, deterministic seed,
+  seconds of runtime.
 - **Exit criteria:** the three economy tests pass and the 50-minute harness reports a completed
-  IPO. **First half met, second half not** — the harness runs and reports `ipo=none`, so P2 stays
-  open until the arc reaches the roadshow.
+  IPO. **Met.** `reachability.test.ts › scripted play reaches the IPO inside the 50-minute window`
+  ends `state=won` at **20.6 sim-minutes** on the player's own map (seed 11), quota paid at the
+  20-minute sample, roadshow fed by one alpha line taken off the market. No capital injected, no
+  belt speed pumped, no preconditions handed out. The blocker was never the rates: machine output
+  was pushed only on the tick a craft completed, so one legal refusal stranded the units and the
+  jam walked backwards through the plant (DESIGN §12b).
 
 ## P3 — Real endings, honest report  (closes #5 #6 #7 #17 #18 #19 #37)
 
@@ -202,7 +213,9 @@ Everything else is untestable until a click does what it looks like.
 - Tests: margin call fires; HQ survives `[X]`; report contains every §9 field; brief-efficiency
   survives a save/reload round trip.
 - **Exit criteria:** a zero-input run ends in ≤ 10 min with the correct title, and a won run renders
-  the full report.
+  the full report. **Met for the state machine** (`endings.test.ts`, `invariants.test.ts`); the report
+  for a *measured* `state=won` run — as opposed to the injected win case — has not been rendered in a
+  browser, which is the same gap as M7's playtest pass.
 
 ## P4 — Onboarding and legibility  (closes #13 #31 #32 #33 #34 #35 #36)
 

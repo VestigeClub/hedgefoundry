@@ -121,8 +121,11 @@ if (err) {
   minutes. Winning is gated on legal cover: unattended, the run loses the office at
   4 m 16 s and legal doc output is the throttle on `IPO PROGRESS`.
 - A research desk shares one intake pad across two ingredients, so research starves
-  unless the plant keeps a surplus; the tier-1 plateau at 50 minutes is this, not a
-  bug.
+  unless the plant keeps a surplus. That cap is real and stays. It is **not** what
+  held the 50-minute run at fuel tier 1 for its last 46 minutes — that was a
+  delivery bug: machine output was pushed only on the tick a craft completed, so a
+  single refusal stranded the units permanently (`docs/DESIGN.md` §12b, and
+  `src/sim/logistics.test.ts` now guards it).
 
 ## Limitations (what a human pass still owes)
 

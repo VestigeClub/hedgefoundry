@@ -7,11 +7,15 @@ and hit your hiring quota to IPO.
 Play it now: **https://vestigeclub.github.io/hedgefoundry/** — current `main`,
 built and deployed by GitHub Actions on every push. No install, no server.
 
-Status: **M1–M6 shipped; M7 (the IPO win route) is still open.** TypeScript
-strict + Vite + Vitest; gate `npm run check` green (**124 tests**, 17 files).
-M7 is stated as open because it is measured that way: the scripted 50-sim-minute
-arc samples `ipo=none` at every point, and an earlier "win verified live" claim
-was withdrawn — see `docs/BUILD_LOG.md:89-91`. Full design in `docs/DESIGN.md`.
+Status: **the IPO route is closed in simulation; browser verification (M7) is
+still open.** TypeScript strict + Vite + Vitest; the gate `npm run check` is
+green (**125 tests**, 17 files). The scripted 50-sim-minute arc in
+`src/sim/reachability.test.ts` — build, defend, expand, hire, no injected
+capital — reports `state=won` at 20.6 minutes. That is a harness
+result, not a playtest: no human hand has reached the win overlay in a
+browser, and nothing has been measured in Safari. (An earlier "IPO win
+verified live" claim was withdrawn as false — `docs/BUILD_LOG.md:89-91`.)
+Full design in `docs/DESIGN.md`.
 
 ## Play
 

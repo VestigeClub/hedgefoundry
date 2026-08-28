@@ -11,6 +11,7 @@ import {
   HIRE_QUOTA,
   SIZES,
   POWER_RANGE,
+  ROADSHOW_ALPHA_NEEDED,
   STARTING_CAPITAL,
   World,
   burnOf,
@@ -394,6 +395,15 @@ const TOWER_SIDES: Dir[] = ["E", "W", "S", "N"];
  * factory (`deskFrom`), not a five-stage line: fifteen tiles of clear shelf
  * east of a patch corner is ground this map does not have, which made the
  * rich tier unbuildable and left funds selling signals forever (§5.2).
+ *
+ * The counts are a ground budget, not a wish list. This planner lays one
+ * straight row per chain and refuses any belt that would touch another entity,
+ * so it claims patch corners fast and never reclaims them. The measured run
+ * filled every corner it could reach (21 miners down) inside four minutes —
+ * three minutes before FUEL TIER II unlocks — after which it logged
+ * `no ground left` for the alpha chain and could never satisfy its own gate of
+ * three factories. Over-building the cheap rung costs the ground for the rich
+ * one, so the cheap rungs are capped here.
  */
 const PROJECTS: Array<{
   kinds: EntityKind[];
@@ -401,9 +411,9 @@ const PROJECTS: Array<{
   count: number;
   deskFrom?: EntityKind;
 }> = [
-  { kinds: ["miner", "cleaner", "funding"], needsTier: 0, count: 10 },
-  { kinds: ["miner", "cleaner", "analytics", "funding"], needsTier: 1, count: 10 },
-  { kinds: LAB_FEED, needsTier: 2, count: 12, deskFrom: "factory" },
+  { kinds: ["miner", "cleaner", "funding"], needsTier: 0, count: 5 },
+  { kinds: ["miner", "cleaner", "analytics", "funding"], needsTier: 1, count: 4 },
+  { kinds: LAB_FEED, needsTier: 2, count: 8, deskFrom: "factory" },
 ];
 
 /** Two tiles off `e` on `side` — room for the belt a wire needs. */
@@ -439,6 +449,33 @@ function attachDesk(w: World, src: Entity): Entity | null {
   return null;
 }
 
+/**
+ * Bulldoze one producer's output lane — the tape and the desk at its head —
+ * and report whether that is what was standing there. Delivery is geometric:
+ * a machine pushes into any adjacent belt that leads away from it, so a lane
+ * whose buyer is gone keeps eating output until it is full and then jams the
+ * line behind it. Re-pointing a line at a new sink means taking the old lane
+ * down with the desk, not just the desk.
+ */
+function clearOutputLane(w: World, src: Entity): boolean {
+  for (const d of DIRS) {
+    const t = sideTile(src, d);
+    let cur = w.entityAt(t.x, t.y);
+    if (!cur?.belt) continue;
+    const lane: Entity[] = [];
+    for (let steps = 0; cur?.belt && steps < 32; steps++) {
+      lane.push(cur);
+      const nd = cur.belt.dir;
+      cur = w.entityAt(cur.x + DX[nd], cur.y + DY[nd]);
+    }
+    if (cur?.kind !== "funding") continue;
+    w.removeEntity(cur.id);
+    for (const b of lane) w.removeEntity(b.id);
+    return true;
+  }
+  return false;
+}
+
 function census(w: World, kind: EntityKind): number {
   let n = 0;
   for (const e of w.entities.values()) if (e.kind === kind) n++;
@@ -456,7 +493,7 @@ function trace(w: World): string {
     `min=${census(w, "miner")} cln=${census(w, "cleaner")} ana=${census(w, "analytics")} ` +
     `fac=${census(w, "factory")} desk=${census(w, "funding")}/${selling} twr=${census(w, "tower")} ` +
     `bro=${census(w, "bro")} waves=${w.waves} made=${JSON.stringify(w.totals)} ` +
-    `ipo=${rs ? `${Math.floor(rs.roadshow!.progress)}% buf=${rs.input?.total ?? 0}` : "none"}`
+    `ipo=${rs ? `${Math.floor(rs.roadshow!.progress)}/${ROADSHOW_ALPHA_NEEDED} buf=${rs.input?.total ?? 0}` : "none"}`
   );
 }
 
@@ -511,12 +548,12 @@ describe("win reachability", () => {
 
   /**
    * Plays the game the way DESIGN.md §8 intends: sell clean data, buy the
-   * lab, climb the fuel ladder, keep the office defended, hire to quota.
-   * Every rule below is a money rule the player can read off the panel. The
-   * assertions cover the legs this script is measured to reach; the IPO leg
-   * is proved separately below, because this script does not reach it.
+   * lab, climb the fuel ladder, keep the office defended, hire to the quota,
+   * then take an alpha line off the market and point it at the roadshow.
+   * Every rule below is a money rule the player can read off the panel — no
+   * injected capital, no pumped belt speed, no preloaded win condition.
    */
-  it("scripted play pays the quota and holds the office for 50 minutes", () => {
+  it("scripted play reaches the IPO inside the 50-minute window", () => {
     const w = makeWorld();
     // Corners nearest the office first, richest as the tie-break. Ordering by
     // richness alone scattered the plant across a 256×256 map: cells landed
@@ -549,6 +586,8 @@ describe("win reachability", () => {
     let ammoDone = false;
     let legalPrinter: Entity | null = null;
     let ipo: Entity | null = null;
+    /** 30 s bucket of the last IPO siting attempt, so a failure does not churn. */
+    let ipoTriedAt = -1;
     /** Turrets kept standing at the office — a backbone, not the defence. */
     const GARRISON = 2;
     /** Research desks the fund runs; each is 0.125 points/s (§5.5). */
@@ -692,15 +731,27 @@ describe("win reachability", () => {
         break;
       }
 
-      // Going public: the roadshow desk drinks 40 alpha over ~45 s (§5.8), so
-      // it is only stood up once the fund has three factories — one alpha line
+      // Going public: the roadshow desk drinks 40 alpha over ~45 s (§5.10), so
+      // it is only stood up once the fund runs three factories — one alpha line
       // cannot feed the IPO and the research desk at once, and a starved lab
-      // stalls the whole ladder. It parks beside a factory already running,
-      // so the alpha is already flowing.
-      const factories = [...w.entities.values()].filter((e) => e.kind === "factory").length;
-      if (!ipo && w.tech.fuelTier >= 2 && factories >= 3 && w.capital > COSTS.roadshow + RESERVE) {
-        const fac = [...w.entities.values()].find((e) => e.kind === "factory");
-        if (fac) {
+      // stalls the whole ladder. The line that feeds it comes off the alpha
+      // market first: delivery is geometric (a machine pushes into whichever
+      // adjacent tape leads away from it), so the desk and its lane have to
+      // come out before anything else can receive that factory's output.
+      // Retried on a 30 s timer — a failed attempt demolishes what it placed,
+      // and re-trying every second would churn refunds.
+      const factories = [...w.entities.values()].filter((e) => e.kind === "factory");
+      const slot = Math.floor(w.timeMs / 30_000);
+      if (
+        !ipo &&
+        ipoTriedAt !== slot &&
+        w.tech.fuelTier >= 2 &&
+        factories.length >= 3 &&
+        w.capital > COSTS.roadshow + RESERVE
+      ) {
+        ipoTriedAt = slot;
+        for (const fac of factories) {
+          if (!clearOutputLane(w, fac)) continue;
           for (const side of TOWER_SIDES) {
             const at = besideTile(fac, side);
             const desk = w.placeEntity("roadshow", at.x, at.y);
@@ -709,55 +760,75 @@ describe("win reachability", () => {
               wire(w, fac, desk);
               ipo = desk;
             } catch {
-              // No straight lane that way; the next side gets the desk's shot.
+              // No straight lane that way; the desk comes back out so it does
+              // not squat ground the next candidate side needs.
+              w.removeEntity(desk.id);
             }
             if (ipo) break;
           }
-          powerEverything(w, true);
+          if (ipo) break;
+          // Nothing took: put the market desk back so the line is not left
+          // producing into nowhere, and give the next factory a turn.
+          attachDesk(w, fac);
         }
+        powerEverything(w, true);
       }
 
-      // Headcount last, and only with money the next line does not need: the
-      // float a fund spends on comp is the float that would have built the
-      // plant paying for the hire after it (§5.8). The bro at the office wall
-      // is still bought above, because losing the HQ ends the run on the spot.
+      // Headcount last, and only with money the next project does not need:
+      // the float a fund spends on comp is the float that would have built the
+      // plant paying for the hire after it (§5.8). The roadshow is a savings
+      // goal as well — comp is optional, the IPO ticket is the win condition —
+      // so until the desk is stood up the script will not spend below its
+      // price (§5.10). Without that rule the plant is built, every dollar
+      // after it goes into comp, and the fund is permanently $20k short of
+      // going public.
       let nextLine = 0;
       for (let pi = 0; pi < PROJECTS.length; pi++) {
         if (wanted[pi]! > 0) nextLine = Math.min(nextLine || Infinity, priceOf(pi) + RESERVE / 2);
       }
-      const saving = nextLine;
+      // Defence outranks the IPO ticket. A bro at the wall is bought off the
+      // moment he is affordable (line above), so the fund keeps a war chest —
+      // what the approaching wave costs to hire out — and saves for the
+      // roadshow only with money above it. Saved without this: the plant gets
+      // built, the cash goes into concrete and comp, and one raid walks into
+      // an office the fund was $20k away from defending (§5.7).
+      let warChest = 0;
+      for (const e of w.entities.values()) {
+        if (e.kind !== "bro") continue;
+        if (Math.max(Math.abs(e.x - office.x), Math.abs(e.y - office.y)) > 40) continue;
+        warChest += BRO_STATS[e.bro!.type].comp;
+      }
+      const ipoTicket = ipo ? 0 : COSTS.roadshow + RESERVE;
+      const saving = Math.min(nextLine || Infinity, warChest + ipoTicket);
+
       for (const e of [...w.entities.values()]) {
         if (e.kind !== "bro") continue;
+        // The quota IS the win condition's headcount (§5.8); comp paid past it
+        // buys nothing but a bigger permanent burn, so the script stops hiring
+        // once it is paid. A bro at the office wall is still bought above,
+        // because losing the HQ ends the run on the spot.
+        if (w.hired >= HIRE_QUOTA) break;
         if (w.capital < saving + BRO_STATS[e.bro!.type].comp) continue;
         w.hireBro(e.id);
       }
     }
 
-    // Measured outcome of this script, recorded rather than hidden: the fund
-    // pays its headcount quota and holds the office for the whole run, but it
-    // never reaches the IPO, because its one research desk starves — a sales
-    // desk standing beside the lab's analytics sells the signal the desk is
-    // supposed to burn, so `pts` never clears the second tech and the alpha
-    // economy that the roadshow runs on is never switched on. Fixing that is
-    // a balance task (§5.5 research throughput), not something this test
-    // should paper over.
-    //
-    // The mechanism is asserted, not just narrated: research never reaches the
-    // second tech, so no richer fuel tier is unlocked and the roadshow leg of
-    // §8 never becomes reachable. The win condition itself (quota + alpha at
-    // the roadshow) is covered directly in `endings.test.ts`.
     const final = trace(w);
-    expect(final).toContain("state=playing");
-    expect(Number(final.match(/hired=(\d+)/)?.[1])).toBeGreaterThanOrEqual(HIRE_QUOTA);
-    // The plateau itself: not one minute-sample of the run reaches fuel tier 2,
-    // the one the roadshow's alpha economy needs.
+    // FUEL TIER II is the rung the roadshow's alpha economy runs on, and the
+    // win is that roadshow closing. Neither was reachable before the machine →
+    // belt drain fix in `updateMachine`: a machine refused an item on its
+    // output strand it in its own buffer for the rest of the run, so the
+    // research desk's alpha feed jammed at the second tech and the alpha
+    // economy never switched on anywhere on this map.
     const tiers = arc.map((l) => Number(/tier=(\d+)/.exec(l)?.[1] ?? 0));
     expect(tiers.length).toBeGreaterThan(0);
-    expect(Math.max(...tiers)).toBeLessThan(2);
+    expect(Math.max(...tiers)).toBeGreaterThanOrEqual(2);
+    expect(final, final).toContain("state=won");
+    expect(Number(final.match(/hired=(\d+)/)?.[1])).toBeGreaterThanOrEqual(HIRE_QUOTA);
   }, 180_000);
 
   /**
-   * Why the run above plateaus, isolated from forty minutes of economy. A
+   * The failure mode the arc above spends its first seven minutes avoiding. A
    * research desk burns one alpha AND one signal per craft (§5.5), and alpha
    * only exists at the far end of a second chain. Feed a desk a perfect
    * signal supply and it still researches nothing — which is why a plant that

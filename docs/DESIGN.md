@@ -366,11 +366,13 @@ payback rows are measured by `src/sim/reachability.test.ts`, not estimated.
   Comp as above. Raids cost the office and the towers (§5.7).
 - **Tuning method**: the Vitest harness plays scripted optimal money rules and
   asserts the ladder is net-positive and the quota payable.
-- **Open, measured, not hidden**: scripted play fills the 250-head quota and
-  survives a full 50-minute run but does not reach the IPO — research
-  throughput (§5.5) is the binding constraint, and a plant that lets a sales
-  desk buy the lab's own signal starves its tech tree. Fixing the economy
-  route to the roadshow is the remaining balance work.
+- **What the harness caught, in order**: the run first plateaued at fuel tier
+  1, which reads like a research-throughput problem and was not one (§12b:
+  delivery, not rates). With that fixed the binding constraints are ground and
+  threat. A straight-row planner gets 18 miner corners on this map, so a fund
+  that spends them on the cheap rungs has no room left for the alpha lines the
+  roadshow needs; and comp paid past the 250-head quota buys nothing but a
+  permanent hole in the cash that buys off the next raid.
 
 ## 12. Milestones (2 weeks, from 2026-08-25)
 - **M1 (d1–2)**: stack up (Vite+TS+Vitest+gate), engine core (loop, camera,
@@ -395,25 +397,33 @@ payback rows are measured by `src/sim/reachability.test.ts`, not estimated.
   end-game report with capital sparkline), live market relay (L1 read-only)
   with client-side SimFeed fallback, autosave + resume, WebAudio synth SFX,
   `?demo` cinematic autoplay, README play guide.
-- **Not done**: the victory itself, and M7's verification pass. The roadshow
-  builds and pays, the overlays exist, but no measured run has reached IPO —
-  the defeat overlay is the only one observed (§11, and the gap note below) —
-  and the cross-platform check (MacBook Safari, the professor's browser) has
-  not been run.
-- **Gate**: `npm run check` = typecheck + 124 Vitest tests (17 files) + Vite
+- **Not done**: M7's cross-platform pass (MacBook Safari, the professor's
+  browser). Everything else in §12 has a measured run behind it.
+- **Gate**: `npm run check` = typecheck + 125 Vitest tests (17 files) + Vite
   build, all green.
 - **Proven by simulation** (`src/sim/reachability.test.ts`): each production
   rung is net-positive (clean 2.0–2.6 k $/s on a ten-line farm, signal
   3.3–4.3 k $/s), and a scripted fund — build, defend, expand, hire — pays
-  its 250-head quota and holds the office for a full 50-minute run.
-- **Open balance gap, recorded not hidden**: the same scripted fund never
-  reaches the IPO. One research desk cannot feed its own two-ingredient recipe
-  at the rate the tech route demands, so the run plateaus at fuel tier 1.
-  What `src/sim/endings.test.ts` covers is the ending state machine, not the
-  win: its case injects $50M of capital, hand-loads the roadshow's alpha,
-  assigns `hired = HIRE_QUOTA` and `progress = NEEDED - 1` outright, then ticks
-  twice. No measured run earns any of those four preconditions. Closing the
-  economy route to them is the known unfinished work (§5.5).
+  its 250-head quota, holds the office and **closes the IPO at 20.6 sim
+  minutes** of a 50-minute window: `state=won` with 18 miners, 12 analytics
+  engines and 7 strategy factories, all twelve techs researched, $299 k in
+  hand and 563 alpha made. No capital is injected and no belt speed is
+  pumped; the script spends only money the panel says it has.
+- **What was actually stopping it**, recorded because the first diagnosis was
+  wrong. It was not research throughput and not sales desks buying the lab's
+  signal: `updateMachine` emptied a machine's output buffer only on the tick a
+  craft completed, so one legal refusal — the research desk caps each
+  ingredient at six units, so a seventh alpha is refused — stranded those
+  units for the rest of the run. `blocked` never cleared, the machine's own
+  input filled, and the refusal walked backwards: the factory jammed and
+  stopped buying signal, the analytics engines jammed behind it, and the desk
+  starved holding half a recipe. The output now drains every tick, so a jam
+  that clears restarts the line by itself, and `src/sim/logistics.test.ts`
+  holds that invariant against a future regression.
+- `src/sim/endings.test.ts` still covers the ending state machine rather than
+  the win: its case injects $50M of capital, hand-loads the roadshow's alpha,
+  assigns `hired = HIRE_QUOTA` and `progress = NEEDED - 1` outright, then
+  ticks twice. The reachability arc is the case that earns all four.
 - **Cross-platform**: any browser opens `http://<host>:7891` (relay serves
   `dist/`); zero install. macOS browser check pending.
 

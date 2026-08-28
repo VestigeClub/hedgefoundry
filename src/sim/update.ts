@@ -168,6 +168,19 @@ function updateMachine(w: World, e: Entity, dtMs: number): void {
       }
     }
   }
+  // Drain whatever the completion tick could not place. A lane closes for one
+  // instant all the time: the research desk caps each ingredient at half its
+  // pad (§5.7), so a seventh alpha is a legal refusal. If the only push is the
+  // one on the craft tick, those items never leave — the machine sits
+  // `blocked` next to a belt that emptied moments later, its own input then
+  // fills, and the refusal walks backwards up the chain: a jammed factory
+  // stops buying signal, the analytics engines jam behind it, and the desk is
+  // left holding six alpha and no signal, which is what froze a 50-minute run
+  // at fuel tier 1 with research stuck at 4 points.
+  for (const item of Object.keys(crafter.output.items)) {
+    pushOutput(w, e, crafter.output, item as Item);
+  }
+  if (crafter.blocked && crafter.output.total < crafter.output.cap) crafter.blocked = false;
 }
 
 function machineSpeedMult(w: World, e: Entity): number {

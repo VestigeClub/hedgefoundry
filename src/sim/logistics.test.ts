@@ -201,4 +201,58 @@ describe("backpressure", () => {
     expect(w.totals.tape).toBeGreaterThanOrEqual(tape + w.totals.clean);
     expect(w.totals.tape).toBeLessThanOrEqual(tape + w.totals.clean + 1);
   });
+
+  /**
+   * The bug this guards: an output buffer used to be emptied only on the tick
+   * a craft completed. One legal refusal — a full belt, or a sink at its
+   * ingredient cap — therefore stranded those units permanently: `blocked`
+   * never cleared, the buffer stayed full, the line behind it starved, and
+   * nothing in the game would ever retry the delivery. On the 50-minute
+   * scripted run this is what froze the research desk's alpha feed at the
+   * second tech for the remaining 46 minutes. `updateMachine` now pushes the
+   * output every tick, so a jam that clears must restart the line by itself.
+   */
+  it("retries a delivery the belt refused once the lane clears", () => {
+    const w = makeWorld(7, 500_000);
+    const maker = place(w, "cleaner", 60, 60, 6);
+    const belt = w.placeEntity("belt", maker.x + maker.w, maker.y);
+    expect(belt).not.toBeNull();
+    belt!.belt!.dir = "E";
+    // The lane head is another cleaner, which eats tape, not clean data: the
+    // belt fills, the output buffer fills, the maker blocks. This is the state
+    // a real jam leaves behind, and it is stable — nothing resolves it.
+    const jam = w.placeEntity("cleaner", maker.x + maker.w + 1, maker.y);
+    expect(jam).not.toBeNull();
+    powerAll(w, [maker, jam!]);
+    // An input buffer holds eight units, so the feed is topped up by hand: the
+    // line has to still be producing while its output is refused, because that
+    // is the state the bug lived in.
+    for (let s = 0; s < 20; s++) {
+      bufferAdd(maker.machine!.crafter.input, "tape", 8);
+      tick(w, 1);
+    }
+    expect(maker.machine!.crafter.blocked).toBe(true);
+    expect(maker.machine!.crafter.output.total).toBe(maker.machine!.crafter.output.cap);
+
+    // Clear the jam the way a player does: the dead sink comes out, a funding
+    // desk (which does buy clean data) goes in, the wire stays where it was.
+    w.removeEntity(jam!.id);
+    const desk = w.placeEntity("funding", jam!.x, jam!.y);
+    expect(desk).not.toBeNull();
+    powerAll(w, [maker, desk!]);
+    for (let s = 0; s < 10; s++) {
+      bufferAdd(maker.machine!.crafter.input, "tape", 8);
+      tick(w, 1);
+    }
+
+    // No one touched the maker's buffers: the stragglers left on their own and
+    // the machine is crafting again.
+    expect(maker.machine!.crafter.blocked).toBe(false);
+    expect(maker.machine!.crafter.output.total).toBe(0);
+    let downstream = desk!.funding!.input.items.clean ?? 0;
+    for (const e of w.entities.values()) {
+      if (e.belt) downstream += e.belt.items.filter((i) => i.item === "clean").length;
+    }
+    expect(downstream).toBeGreaterThan(0);
+  });
 });
