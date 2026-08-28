@@ -22,6 +22,8 @@ interface SaveFormat {
     capital: number;
     timeMs: number;
     totals: Record<string, number>;
+    /** Added with the void rule; absent in saves written before it → zeros. */
+    writtenOff?: Record<string, number>;
     tech: Record<string, number>;
     researched: string[];
     researchTarget: string | null;
@@ -141,6 +143,7 @@ export function serializeWorld(w: World, mapOpts: MapGenOpts): string {
       capital: w.capital,
       timeMs: w.timeMs,
       totals: { ...w.totals },
+      writtenOff: { ...w.writtenOff },
       tech: { ...w.tech },
       researched: [...w.researched],
       researchTarget: w.researchTarget,
@@ -183,6 +186,7 @@ export function deserializeWorld(json: string): { world: World; map: TileMap; fe
   w.capital = save.world.capital;
   w.timeMs = save.world.timeMs;
   w.totals = { ...save.world.totals } as World["totals"];
+  w.writtenOff = { tape: 0, clean: 0, signal: 0, alpha: 0, brief: 0, ...(save.world.writtenOff ?? {}) };
   w.tech = { ...save.world.tech } as unknown as World["tech"];
   w.researched = new Set(save.world.researched);
   w.researchTarget = save.world.researchTarget;

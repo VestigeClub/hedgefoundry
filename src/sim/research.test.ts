@@ -57,6 +57,20 @@ describe("research tree", () => {
     expect(desk.machine!.crafter.input.total).toBe(2); // 12 fed, 10 consumed
   });
 
+  it("re-asking for the current tech keeps banked points; changing it clears", () => {
+    const w = makeWorld();
+    w.setResearchTarget("tape-speed-1");
+    w.researchPoints = 4;
+    w.setResearchTarget("tape-speed-1"); // the panel routes every row click through here
+    expect(w.researchPoints).toBe(4); // a check-in on the in-flight tech must not burn the run
+    w.setResearchTarget(null); // opting out is a real change
+    expect(w.researchPoints).toBe(0);
+    w.setResearchTarget("tape-speed-1");
+    w.researchPoints = 4;
+    w.setResearchTarget("cleaner-speed-1");
+    expect(w.researchPoints).toBe(0); // points belong to the tech that earned them
+  });
+
   it("desk idles (consumes nothing) without a target", () => {
     const w = makeWorld();
     const spot = findSpot(w, "research", 50, 50, 3);

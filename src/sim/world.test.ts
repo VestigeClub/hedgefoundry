@@ -113,9 +113,11 @@ describe("mining + belts", () => {
     tick(w, 5);
     expect(w.totals.tape).toBeGreaterThanOrEqual(4);
     expect(belt.belt!.items.length).toBeGreaterThan(0);
-    // conservation: every produced item is either on the belt or in the
-    // buffer — no duplication, no loss.
-    expect(w.totals.tape).toBe(belt.belt!.items.length + miner.miner!.output.total);
+    // conservation: every produced item is either on the belt, in the
+    // buffer, or written off at the dead lane head — no duplication, no
+    // unaccounted loss.
+    expect(w.totals.tape).toBe(belt.belt!.items.length + miner.miner!.output.total + w.writtenOff.tape);
+    expect(w.writtenOff.tape).toBeGreaterThan(0); // the head had nowhere to go
   });
 
   it("output is never loaded into a belt that runs back into its own machine", () => {

@@ -57,7 +57,7 @@ export interface Entity {
   researchTarget?: string | null;
   miner?: { output: Buffer; rateAcc: number };
   funding?: { input: Buffer; selling: Item | null };
-  belt?: { dir: Dir; speed: number; items: BeltItem[] };
+  belt?: { dir: Dir; speed: number; items: BeltItem[]; jamMs?: number };
   trader?: { dir: Dir; cooldownMs: number; busyMs: number };
   /** Generic input buffer (tower ammo, roadshow alpha). */
   input?: Buffer;
@@ -178,6 +178,10 @@ export class World {
   researched = new Set<string>();
   researchTarget: string | null = null;
   researchPoints = 0;
+  /** Items written off: surplus at a full terminal sink, and belt heads whose
+   * lane had nowhere to go (update.ts, void rule). Reconciles `totals`. */
+  writtenOff: Record<Item, number> = { tape: 0, clean: 0, signal: 0, alpha: 0, brief: 0 };
+  lastWasteLogMs = 0;
   /** Coarse impact field (pollution analog): IMPACT_CELL² tiles per cell. */
   impact: Float32Array;
   impactW: number;
@@ -262,8 +266,11 @@ export class World {
     if (this.timeline.length > 200) this.timeline.shift();
   }
 
-  /** Point the Research Desk at a tech; resets progress on change. */
+  /** Point the Research Desk at a tech; resets progress on change. Re-asking
+   * for the current target is a no-op — banked points belong to that tech, and
+   * the panel routes every click through here. */
   setResearchTarget(id: string | null): void {
+    if (id === this.researchTarget) return;
     this.researchTarget = id;
     this.researchPoints = 0;
   }

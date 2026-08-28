@@ -240,13 +240,12 @@ describe("backpressure", () => {
     const desk = w.placeEntity("funding", jam!.x, jam!.y);
     expect(desk).not.toBeNull();
     powerAll(w, [maker, desk!]);
-    for (let s = 0; s < 10; s++) {
-      bufferAdd(maker.machine!.crafter.input, "tape", 8);
-      tick(w, 1);
-    }
+    // And nothing more is fed: the input is left as the jam left it, so a new
+    // craft cannot be the reason anything moves below.
+    for (let s = 0; s < 10; s++) tick(w, 1);
 
-    // No one touched the maker's buffers: the stragglers left on their own and
-    // the machine is crafting again.
+    // The stragglers left on their own and the machine is unblocked again — the
+    // retry is not coupled to completing another craft.
     expect(maker.machine!.crafter.blocked).toBe(false);
     expect(maker.machine!.crafter.output.total).toBe(0);
     let downstream = desk!.funding!.input.items.clean ?? 0;
@@ -254,5 +253,122 @@ describe("backpressure", () => {
       if (e.belt) downstream += e.belt.items.filter((i) => i.item === "clean").length;
     }
     expect(downstream).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * The audit's lane defects, each pinned by the state a player can actually
+ * reach: a sink that dies under a live belt (A1), a belt loop that leads
+ * output back into the machine that pushed it (A2), and a belt standing on
+ * a side tile the output used to ignore (A4).
+ */
+describe("dead-end lanes (audit A1/A2/A4)", () => {
+  /** cleaner → east belt → analytics, powered; tape is fed by hand. */
+  function feedLine(w: World): { cleaner: Entity; belt: Entity; sink: Entity } {
+    const cleaner = place(w, "cleaner", 60, 60, 6);
+    const belt = w.placeEntity("belt", cleaner.x + cleaner.w, cleaner.y);
+    expect(belt).not.toBeNull();
+    belt!.belt!.dir = "E";
+    const sink = w.placeEntity("analytics", cleaner.x + cleaner.w + 1, cleaner.y);
+    expect(sink).not.toBeNull();
+    powerAll(w, [cleaner, sink!]);
+    return { cleaner, belt: belt!, sink: sink! };
+  }
+
+  it("a sink that dies leaves a draining lane, a counted write-off, and a live line", () => {
+    const w = makeWorld(7, 5_000_000);
+    const { cleaner, sink } = feedLine(w);
+    w.removeEntity(sink.id);
+    for (let s = 0; s < 40; s++) {
+      bufferAdd(cleaner.machine!.crafter.input, "tape", 8);
+      tick(w, 1);
+    }
+    // Every unit with nowhere to go is counted, never parked at pos 1.
+    expect(w.writtenOff.clean).toBeGreaterThan(0);
+    // The line cycles, not petrifies: production continues AND more units
+    // keep being voided (supply 1/s outruns the void drain, so `blocked`
+    // legitimately pulses with belt capacity — throughput is the proof).
+    const made = w.totals.clean;
+    const voided = w.writtenOff.clean;
+    tick(w, 5);
+    expect(w.totals.clean).toBeGreaterThan(made);
+    expect(w.writtenOff.clean).toBeGreaterThan(voided);
+    // Conservation with the write-off in the ledger: totals = world + voided.
+    let inWorld = cleaner.machine!.crafter.output.items.clean ?? 0;
+    for (const e of w.entities.values()) {
+      if (e.belt) inWorld += e.belt.items.filter((i) => i.item === "clean").length;
+    }
+    expect(w.totals.clean).toBe(inWorld + w.writtenOff.clean);
+  });
+
+  it("rebuilding the sink on the dead lane's tile resumes delivery at once", () => {
+    const w = makeWorld(7, 5_000_000);
+    const { cleaner, sink } = feedLine(w);
+    const sx = sink.x;
+    const sy = sink.y;
+    w.removeEntity(sink.id);
+    for (let s = 0; s < 10; s++) {
+      bufferAdd(cleaner.machine!.crafter.input, "tape", 8);
+      tick(w, 1);
+    }
+    const rebuilt = w.placeEntity("analytics", sx, sy);
+    expect(rebuilt).not.toBeNull();
+    tick(w, 4);
+    expect(rebuilt!.machine!.crafter.input.items.clean ?? 0).toBeGreaterThan(0);
+  });
+
+  it("output is never loaded into a belt loop that runs back into the machine", () => {
+    const w = makeWorld();
+    const cleaner = place(w, "cleaner", 60, 60, 6);
+    bufferAdd(cleaner.machine!.crafter.output, "clean", 2);
+    const b1 = w.placeEntity("belt", cleaner.x + 3, cleaner.y);
+    const b2 = w.placeEntity("belt", cleaner.x + 4, cleaner.y);
+    const b3 = w.placeEntity("belt", cleaner.x + 4, cleaner.y + 1);
+    const b4 = w.placeEntity("belt", cleaner.x + 3, cleaner.y + 1);
+    expect([b1, b2, b3, b4].every((b) => b !== null)).toBe(true);
+    b1!.belt!.dir = "E";
+    b2!.belt!.dir = "S";
+    b3!.belt!.dir = "W";
+    b4!.belt!.dir = "W"; // its exit tile is inside the cleaner's rect
+    tick(w, 2);
+    const onLanes =
+      b1!.belt!.items.length + b2!.belt!.items.length + b3!.belt!.items.length + b4!.belt!.items.length;
+    expect(onLanes).toBe(0);
+    expect(cleaner.machine!.crafter.output.items.clean).toBe(2);
+    expect(w.writtenOff.clean).toBe(0);
+  });
+
+  it("a belt on any side tile of a machine receives its output", () => {
+    const w = makeWorld();
+    const cleaner = place(w, "cleaner", 60, 60, 6);
+    const mid = w.placeEntity("belt", cleaner.x + cleaner.w, cleaner.y + 1); // middle row of the east edge
+    expect(mid).not.toBeNull();
+    mid!.belt!.dir = "E";
+    bufferAdd(cleaner.machine!.crafter.output, "clean", 2);
+    tick(w, 1);
+    // The belt sits on the MIDDLE row of the east edge — one row off the
+    // corner tile the old port table probed. The per-tick drain moves both.
+    expect(mid!.belt!.items.length).toBe(2);
+    expect(cleaner.machine!.crafter.output.total).toBe(0);
+  });
+
+  it("the IPO bar never runs backwards when the alpha lane runs dry", () => {
+    const w = makeWorld(7, 10_000_000);
+    w.hired = 250;
+    const rs = place(w, "roadshow", 60, 60, 6);
+    powerAll(w, [rs]);
+    // Marginal feed: one alpha per step — the exact state that made the bar
+    // lose its fraction every crossing under the flooring rule.
+    bufferAdd(rs.input!, "alpha", 1);
+    let last = rs.roadshow!.progress;
+    for (let s = 0; s < 60; s++) {
+      tick(w, 1.15);
+      expect(rs.roadshow!.progress).toBeGreaterThanOrEqual(last);
+      last = rs.roadshow!.progress;
+      bufferAdd(rs.input!, "alpha", 1);
+      expect(rs.roadshow!.progress).toBeGreaterThanOrEqual(last);
+      last = rs.roadshow!.progress;
+    }
+    expect(rs.roadshow!.progress).toBeGreaterThan(30);
   });
 });

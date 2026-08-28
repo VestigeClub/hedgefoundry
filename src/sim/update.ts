@@ -137,8 +137,8 @@ function updateMachine(w: World, e: Entity, dtMs: number): void {
   const scale = scaleFor(e.kind, w.tech);
   const wasCrafting = crafter.crafting;
   crafter.tick(dtMs * speedMult, mult, scale);
-  if (powered && crafter.crafting && !crafter.blocked) w.working.add(e.id);
   const produced = crafter.takeProduced();
+  let researchWaste = false;
   if (crafter.recipe.id === "research") {
     if (!wasCrafting && crafter.crafting) {
       e.researchTarget = w.researchTarget;
@@ -154,9 +154,15 @@ function updateMachine(w: World, e: Entity, dtMs: number): void {
           w.researchPoints = 0;
           w.setResearchTarget(null);
         }
+      } else {
+        // Another desk closed this tech mid-craft: the point never counted,
+        // so the completion tick does not bill either (audit B2 — a lab was
+        // charging 40 $/s for work the world threw away).
+        researchWaste = true;
       }
     }
   }
+  if (powered && crafter.crafting && !crafter.blocked && !researchWaste) w.working.add(e.id);
   if (produced) {
     // Credit only what was actually made, then move it onto adjacent belts;
     // the remainder waits in the output buffer for traders.
@@ -198,6 +204,15 @@ function machineSpeedMult(w: World, e: Entity): number {
 }
 
 const BELT_SPACING = 0.25;
+/**
+ * How long a belt head waits on a target that will not take the item before
+ * the item is written off. Without this the head parks at `pos = 1` forever
+ * (a destroyed or replaced sink leaves the lane pointing at nothing), tail
+ * room fails lane-wide, and every machine behind it blocks for the rest of
+ * the run — the audit's worst live defect. A lane that drains can be re-wired
+ * by the player; a lane that petrifies cannot.
+ */
+const JAM_VOID_MS = 2_000;
 
 /** Insert an item keeping the belt's ascending-pos order (head = last). */
 function beltPush(e: Entity, item: Item, pos: number): void {
@@ -218,35 +233,88 @@ function updateBelt(w: World, e: Entity, dtMs: number): void {
     const maxPos = ahead ? ahead.pos - BELT_SPACING : 1;
     const newPos = Math.min(it.pos + advance, Math.max(it.pos, maxPos));
     if (newPos >= 1 && !ahead) {
-      if (tryBeltExit(w, e, it)) {
+      const exit = tryBeltExit(w, e, it);
+      if (exit === "delivered") {
         items.pop();
+        b.jamMs = 0;
         continue;
       }
-      it.pos = 1 - 0.001;
+      if (exit === "backpressure") {
+        // The target will take the item and is only momentarily full (or the
+        // next belt has no tail room). Hold the head indefinitely: the stall
+        // walking upstream is the player's signal that the line is
+        // over-supplied, and nothing is ever destroyed here.
+        b.jamMs = 0;
+        it.pos = 1 - 0.001;
+        continue;
+      }
+      // "dead": nothing at the exit can ever take this item (target gone, or
+      // it rejects the item type). Void it after a grace period so the lane
+      // drains and rebuilds heal instead of petrifying (audit A1).
+      const jamMs = (b.jamMs ?? 0) + dtMs;
+      if (jamMs >= JAM_VOID_MS) {
+        items.pop();
+        b.jamMs = 0;
+        w.writtenOff[it.item] += 1;
+        if (w.timeMs - w.lastWasteLogMs >= 10_000) {
+          w.lastWasteLogMs = w.timeMs;
+          w.logEvent(`WROTE OFF STRANDED ${it.item.toUpperCase()}`);
+        }
+      } else {
+        b.jamMs = jamMs;
+        it.pos = 1 - 0.001;
+      }
     } else {
       it.pos = newPos;
     }
   }
 }
 
-/** Belt head → next belt or adjacent machine input. */
-function tryBeltExit(w: World, e: Entity, it: { item: Item }): boolean {
+/**
+ * Belt head → next belt or adjacent machine input.
+ * `backpressure` = the target takes this item and is only full right now —
+ * hold the head and let the stall travel upstream. `dead` = no waiting can
+ * deliver: the exit tile is empty, or the target rejects the item's type.
+ * (Only `acceptsItem`'s type half may say `dead`: its pad-quota half is a
+ * legal refusal that clears the moment someone consumes.)
+ */
+type BeltExit = "delivered" | "backpressure" | "dead";
+
+function tryBeltExit(w: World, e: Entity, it: { item: Item }): BeltExit {
   const dir = e.belt!.dir;
-  const nx = e.x + DX[dir];
-  const ny = e.y + DY[dir];
-  const next = w.entityAt(nx, ny);
-  if (!next) return false;
+  const next = w.entityAt(e.x + DX[dir], e.y + DY[dir]);
+  if (!next) return "dead";
   if (next.kind === "belt") {
     if (beltTailRoom(next)) {
       beltPush(next, it.item, 0);
-      return true;
+      return "delivered";
     }
-    return false;
+    return "backpressure";
   }
   const buf = inputBufferOf(next);
-  if (!buf || !acceptsItem(next, it.item, w.tech)) return false;
-  // A full terminal sink writes surplus off rather than blocking the lane.
-  return bufferAdd(buf, it.item, 1) > 0 || isTerminalSink(next);
+  if (!buf) return "dead"; // a belt pointing at an office or a vault
+  if (!acceptsItem(next, it.item, w.tech)) {
+    // `acceptsItem` folds the pad quota into its answer; ask the type rule
+    // again alone: right kind but full quota is backpressure, wrong kind is dead.
+    const c = next.machine?.crafter;
+    const typeOk = c
+      ? (c.recipe.in[it.item] ?? 0) > 0
+      : next.funding
+        ? sellableFuels(w.tech).some((f) => f.fuel === it.item)
+        : next.kind === "tower"
+          ? it.item === "brief"
+          : next.kind === "roadshow" && it.item === "alpha";
+    return typeOk ? "backpressure" : "dead";
+  }
+  const added = bufferAdd(buf, it.item, 1);
+  if (added > 0) return "delivered";
+  // A full terminal sink writes surplus off rather than blocking the lane
+  // (§5.7) — counted, never left to jam.
+  if (isTerminalSink(next)) {
+    w.writtenOff[it.item] += 1;
+    return "delivered";
+  }
+  return "backpressure";
 }
 
 function beltTailRoom(e: Entity): boolean {
@@ -255,25 +323,54 @@ function beltTailRoom(e: Entity): boolean {
   return items[0]!.pos >= BELT_SPACING;
 }
 
+const SIDES: readonly Dir[] = ["E", "S", "W", "N"];
+
+/**
+ * Trace a belt's downstream path; true if it re-enters the pushing machine's
+ * rect within BELT_TRACE_HOPS. The old guard rejected only a belt pointing
+ * straight back, so an E→S→W run looping into the machine passed — output
+ * landed in a dead end and petrified there (audit A2, same failure shape as
+ * the fixed self-strand bug).
+ */
+const BELT_TRACE_HOPS = 16;
+function beltReturnsTo(w: World, head: Entity, e: Entity): boolean {
+  let x = head.x;
+  let y = head.y;
+  let dir = head.belt!.dir;
+  for (let hop = 0; hop < BELT_TRACE_HOPS; hop++) {
+    x += DX[dir];
+    y += DY[dir];
+    const t = w.entityAt(x, y);
+    if (!t) return false;
+    if (t === e) return true;
+    if (t.kind !== "belt") return false; // a real destination: the lane leads away
+    dir = t.belt!.dir;
+  }
+  return false;
+}
+
 /**
  * Push one item from a machine/miner output onto an adjacent belt that leads
- * away from the machine (§5.2). A belt facing the machine is an input lane:
- * output dropped there can never be delivered — the machine rejects its own
- * product, the item parks at the lane head and blocks everything behind it,
- * which dead-locks the whole line.
+ * away from the machine (§5.2). Every belt tile touching the rect's sides is
+ * an output port: the input side accepts delivery at any edge tile of the
+ * target rect (`tryBeltExit` → `entityAt`), so output scans the whole side
+ * too — a port pinned to one corner per edge made edge-centred belts
+ * placeable, green in the ghost, and permanently deaf (audit A4).
+ * A belt whose run leads back into the machine is an input lane, not output:
+ * output dropped there can never be delivered (§5.2, A2).
  */
 function pushToAdjacentBelt(w: World, e: Entity, item: Item): boolean {
-  const sides: Dir[] = ["E", "S", "W", "N"];
-  for (const dir of sides) {
-    // Adjacent tile on that side of the entity's rect (E: x+w, W: x-1, …).
-    const nx = dir === "E" ? e.x + e.w : dir === "W" ? e.x - 1 : e.x;
-    const ny = dir === "S" ? e.y + e.h : dir === "N" ? e.y - 1 : e.y;
-    const b = w.entityAt(nx, ny);
-    if (b?.kind !== "belt" || !beltTailRoom(b)) continue;
-    const run = b.belt!;
-    if (DX[run.dir] === -DX[dir] && DY[run.dir] === -DY[dir]) continue;
-    beltPush(b, item, 0);
-    return true;
+  for (const dir of SIDES) {
+    const along = dir === "E" || dir === "W" ? e.h : e.w;
+    for (let off = 0; off < along; off++) {
+      const nx = dir === "E" ? e.x + e.w : dir === "W" ? e.x - 1 : e.x + off;
+      const ny = dir === "S" ? e.y + e.h : dir === "N" ? e.y - 1 : e.y + off;
+      const b = w.entityAt(nx, ny);
+      if (b?.kind !== "belt" || !beltTailRoom(b)) continue;
+      if (beltReturnsTo(w, b, e)) continue;
+      beltPush(b, item, 0);
+      return true;
+    }
   }
   return false;
 }
@@ -602,11 +699,16 @@ function updateRoadshow(w: World, e: Entity, dtMs: number): void {
   if (!w.powered.has(e.id)) return;
   if (w.hired < HIRE_QUOTA) return;
   const r = e.roadshow!;
-  const before = Math.floor(r.progress);
-  r.progress += ROADSHOW_DELIVERY_PER_SEC * (dtMs / 1000);
+  const prev = r.progress;
+  const before = Math.floor(prev);
+  r.progress = prev + ROADSHOW_DELIVERY_PER_SEC * (dtMs / 1000);
   if (Math.floor(r.progress) > before) {
     if (bufferCount(e.input!, "alpha") <= 0) {
-      r.progress = before; // no fuel: hold progress
+      // Hold at the pre-tick value, not the integer floor: progress is a
+      // continuous burn, and flooring on a dry step threw away every
+      // fraction earned since the last unit — the bar visibly ran backwards
+      // at marginal feed (audit A3).
+      r.progress = prev;
       return;
     }
     bufferTake(e.input!, "alpha", 1);
