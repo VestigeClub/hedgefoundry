@@ -390,12 +390,17 @@ payback rows are measured by `src/sim/reachability.test.ts`, not estimated.
   Safari/Chrome, professor browser), README play guide, presentation assets.
 
 ## 12b. Shipped status (2026-08-27 →)
-- **Done**: M1–M7 sim + UI (production chain, belts/traders, power/brownout,
-  research, bros/impact/defense, hire, HQ, margin call, IPO roadshow,
-  win/lose overlays + end-game report with capital sparkline), live market
-  relay (L1 read-only) with client-side SimFeed fallback, autosave + resume,
-  WebAudio synth SFX, `?demo` cinematic autoplay.
-- **Gate**: `npm run check` = typecheck + 117 Vitest tests (16 files) + Vite
+- **Done**: M1–M6 sim + UI (production chain, belts/traders, power/brownout,
+  research, bros/impact/defense, hire, HQ, margin call, roadshow build,
+  end-game report with capital sparkline), live market relay (L1 read-only)
+  with client-side SimFeed fallback, autosave + resume, WebAudio synth SFX,
+  `?demo` cinematic autoplay, README play guide.
+- **Not done**: the victory itself, and M7's verification pass. The roadshow
+  builds and pays, the overlays exist, but no measured run has reached IPO —
+  the defeat overlay is the only one observed (§11, and the gap note below) —
+  and the cross-platform check (MacBook Safari, the professor's browser) has
+  not been run.
+- **Gate**: `npm run check` = typecheck + 124 Vitest tests (17 files) + Vite
   build, all green.
 - **Proven by simulation** (`src/sim/reachability.test.ts`): each production
   rung is net-positive (clean 2.0–2.6 k $/s on a ten-line farm, signal
