@@ -5,14 +5,15 @@ Date: 2026-08-27. Baseline: `main` @ `e21150f` (pre-re-authoring; the same conte
 Source: full audit of 2026-08-27 (47 numbered issues; issue numbers referenced below as `#N`).
 
 **Status (2026-08-28, P2 closed in simulation).** Gate green — typecheck clean, **125 tests /
-17 files**, build 65.91 kB (23.74 kB gz); CI green on the last pushed tip. Work landed out of the
+17 files**, build 65.93 kB (23.76 kB gz); CI green on the last pushed tip. Work landed out of the
 locked order, via the concurrent implementation session: *"Fix three sim bugs that froze the
 factory, and rebalance the fuel ladder"* (belt→desk delivery, `acceptsItem` fuel/alpha branch,
 `rollWorking` call, `TECHS` restored to 16, `hireBro`, the `hp <= 0` guard → P1/P2 code), *"Add the
 submission scaffold and state the measured horizon honestly"* (→ P6 partial), and now *"Drain
-machine output every tick so the win route opens"* (→ P2, and the P3 win state with it). Cite those
-subjects, not shas — history was re-authored after this line was first written and every sha moved
-once already (see the re-authoring block below).
+machine output every tick so the win route opens* (→ P2, and the P3 win state with it) and its
+follow-up *Stop the IPO siting from burning the line it means to re-site*. Cite those subjects, not
+shas — history was re-authored after this line was first written and every sha moved once already
+(see the re-authoring block below).
 **P2 met.** The scripted 50-sim-minute arc reports `state=won` at **20.6 min**: 251/250 hired,
 $299,710 in hand, all twelve techs, 18 miners / 12 analytics engines / 7 strategy factories, 563
 alpha made, 95 waves survived. What actually unlocked it was a delivery bug, not balance:

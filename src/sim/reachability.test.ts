@@ -738,8 +738,8 @@ describe("win reachability", () => {
       // market first: delivery is geometric (a machine pushes into whichever
       // adjacent tape leads away from it), so the desk and its lane have to
       // come out before anything else can receive that factory's output.
-      // Retried on a 30 s timer — a failed attempt demolishes what it placed,
-      // and re-trying every second would churn refunds.
+      // Retried on a 30 s timer: a raid or a demolition can free the pad the
+      // desk needs, and the attempt only tears down a line it can re-site.
       const factories = [...w.entities.values()].filter((e) => e.kind === "factory");
       const slot = Math.floor(w.timeMs / 30_000);
       if (
@@ -751,25 +751,26 @@ describe("win reachability", () => {
       ) {
         ipoTriedAt = slot;
         for (const fac of factories) {
-          if (!clearOutputLane(w, fac)) continue;
-          for (const side of TOWER_SIDES) {
-            const at = besideTile(fac, side);
-            const desk = w.placeEntity("roadshow", at.x, at.y);
-            if (!desk) continue;
-            try {
-              wire(w, fac, desk);
-              ipo = desk;
-            } catch {
-              // No straight lane that way; the desk comes back out so it does
-              // not squat ground the next candidate side needs.
-              w.removeEntity(desk.id);
-            }
-            if (ipo) break;
+          // Site the roadshow before anything is demolished. Bulldozing a
+          // working line refunds only half of the desk and its tape, so a
+          // failed attempt is a real loss and must not repeat on a timer.
+          const spot = TOWER_SIDES.map((side) => besideTile(fac, side)).find(
+            (at) => w.canPlace("roadshow", at.x, at.y) === null,
+          );
+          if (!spot || !clearOutputLane(w, fac)) continue;
+          const desk = w.placeEntity("roadshow", spot.x, spot.y);
+          if (!desk) continue;
+          try {
+            wire(w, fac, desk);
+            ipo = desk;
+          } catch {
+            // No straight lane from that pad to the factory's output: the desk
+            // comes back out and the line goes back on the market.
+            w.removeEntity(desk.id);
+            attachDesk(w, fac);
+            continue;
           }
           if (ipo) break;
-          // Nothing took: put the market desk back so the line is not left
-          // producing into nowhere, and give the next factory a turn.
-          attachDesk(w, fac);
         }
         powerEverything(w, true);
       }

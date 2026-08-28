@@ -7,7 +7,7 @@
  */
 import { DX, DY, type Dir, type Entity, type EntityKind, type World } from "./world";
 import { BRO_STATS, HIRE_QUOTA, IMPACT_CELL, ROADSHOW_ALPHA_NEEDED, ROADSHOW_DELIVERY_PER_SEC, burnOf, type BroType } from "./world";
-import type { Item } from "./items";
+import { ITEMS, type Item } from "./items";
 import { acceptsItem, bufferAdd, bufferCount, bufferTake, inputBufferOf, isTerminalSink, scaleFor, type Buffer } from "./production";
 import { sellableFuels } from "./recipes";
 import { TECH_BY_ID, applyTech } from "./research";
@@ -177,9 +177,9 @@ function updateMachine(w: World, e: Entity, dtMs: number): void {
   // stops buying signal, the analytics engines jam behind it, and the desk is
   // left holding six alpha and no signal, which is what froze a 50-minute run
   // at fuel tier 1 with research stuck at 4 points.
-  for (const item of Object.keys(crafter.output.items)) {
-    pushOutput(w, e, crafter.output, item as Item);
-  }
+  // Iterated over the catalogue, not `Object.keys` of the buffer: this runs
+  // for every machine on every tick and the tick loop allocates nothing.
+  for (const item of ITEMS) pushOutput(w, e, crafter.output, item);
   if (crafter.blocked && crafter.output.total < crafter.output.cap) crafter.blocked = false;
 }
 
