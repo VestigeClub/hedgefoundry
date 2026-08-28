@@ -4,7 +4,8 @@ Date: 2026-08-27. Baseline: `main` @ `e21150f` (pre-re-authoring; the same conte
 `5690a0f` on the current `main`), gate green (typecheck + 75 tests + build).
 Source: full audit of 2026-08-27 (47 numbered issues; issue numbers referenced below as `#N`).
 
-**Status (2026-08-27, publish-ready pass, `main` tip; gate measured green at `0f2e95a`).** Typecheck clean, **124 tests /
+**Status (2026-08-28, post-publish).** Last pushed tip: `237fd43`, CI green on that
+commit — typecheck clean, **124 tests /
 17 files**, build 65.79 kB (23.71 kB gz). Work landed out of the locked order, via the
 concurrent implementation session: *"Fix three sim bugs that froze the factory, and rebalance
 the fuel ladder"* (belt→desk delivery, `acceptsItem` fuel/alpha branch, `rollWorking` call,
@@ -26,8 +27,9 @@ commit now carries a real body and the `Assisted-by:` trailer, and the internal 
 in *file contents* (not just messages) have been scrubbed out of the 14 commits that carried them.
 **Published (2026-08-28):** repo `github.com/VestigeClub/hedgefoundry` (public), game live at
 `https://vestigeclub.github.io/hedgefoundry/` — verified serving the built bundle and ticking in real
-time from the public URL. **Next action:** the P2/P3 pass that makes the arc reach IPO; no rate
-tuning before that, per the ordering rule below.
+time from the public URL. **Next action:** the P2/P3 pass that makes the arc reach IPO,
+from `237fd43` onward; no rate tuning before that, per the ordering rule below. The commit
+that lands this line moves the tip, so `git log -1` stays authoritative over this number.
 
 **History re-authored (2026-08-27 23:2x UTC, closes item 4).** All 22 commits rebuilt with
 `git commit-tree` plumbing (worktree and index untouched, so concurrent unstaged edits survived).

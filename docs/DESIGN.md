@@ -409,8 +409,11 @@ payback rows are measured by `src/sim/reachability.test.ts`, not estimated.
 - **Open balance gap, recorded not hidden**: the same scripted fund never
   reaches the IPO. One research desk cannot feed its own two-ingredient recipe
   at the rate the tech route demands, so the run plateaus at fuel tier 1.
-  The win condition itself is covered directly (`src/sim/endings.test.ts`);
-  the economy route to it is the known unfinished work (§5.5).
+  What `src/sim/endings.test.ts` covers is the ending state machine, not the
+  win: its case injects $50M of capital, hand-loads the roadshow's alpha,
+  assigns `hired = HIRE_QUOTA` and `progress = NEEDED - 1` outright, then ticks
+  twice. No measured run earns any of those four preconditions. Closing the
+  economy route to them is the known unfinished work (§5.5).
 - **Cross-platform**: any browser opens `http://<host>:7891` (relay serves
   `dist/`); zero install. macOS browser check pending.
 
