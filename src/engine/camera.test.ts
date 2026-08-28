@@ -38,12 +38,20 @@ describe("Camera", () => {
     expect(c.zoom).toBe(MIN_ZOOM);
   });
 
-  it("panByScreen moves the view by dx/zoom", () => {
+  it("panByScreen is drag semantics: view moves OPPOSITE the pointer delta", () => {
     const c = cam();
     c.zoom = 2;
     c.panByScreen(100, 50);
     expect(c.x).toBeCloseTo(-50, 9);
     expect(c.y).toBeCloseTo(-25, 9);
+  });
+
+  it("panByWorld is key semantics: view moves WITH the delta (D pans right)", () => {
+    const c = cam();
+    c.zoom = 2;
+    c.panByWorld(100, 50);
+    expect(c.x).toBeCloseTo(50, 9);
+    expect(c.y).toBeCloseTo(25, 9);
   });
 
   it("visibleTiles covers exactly the view, inclusive", () => {

@@ -31,10 +31,19 @@ export class Camera {
     return { x: (wx - this.x) * this.zoom, y: (wy - this.y) * this.zoom };
   }
 
-  /** Pan by a screen-space delta (e.g. drag). */
+  /**
+   * Pan by a screen-space delta as a DRAG (grab-and-move-the-world): the
+   * camera moves opposite the pointer, so content follows the cursor.
+   */
   panByScreen(dx: number, dy: number): void {
     this.x -= dx / this.zoom;
     this.y -= dy / this.zoom;
+  }
+
+  /** Pan the camera in its own direction: pressing right moves right. Keys use this. */
+  panByWorld(dx: number, dy: number): void {
+    this.x += dx / this.zoom;
+    this.y += dy / this.zoom;
   }
 
   /** Zoom by factor around a screen anchor; the world point under the anchor stays fixed. */

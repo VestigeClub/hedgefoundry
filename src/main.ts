@@ -246,7 +246,9 @@ function renderFrame(_alpha: number): void {
     (input.keys.has("KeyS") || input.keys.has("ArrowDown") ? 1 : 0) -
     (input.keys.has("KeyW") || input.keys.has("ArrowUp") ? 1 : 0);
   if (dxk !== 0 || dyk !== 0) {
-    camera.panByScreen(dxk * PAN_SPEED * (frameMs / 1000), dyk * PAN_SPEED * (frameMs / 1000));
+    // panByScreen is drag semantics (camera moves OPPOSITE the delta) — using
+    // it for keys inverted WASD/arrows: D panned left, W panned down.
+    camera.panByWorld(dxk * PAN_SPEED * (frameMs / 1000), dyk * PAN_SPEED * (frameMs / 1000));
   }
 
   // Middle-drag pan.
