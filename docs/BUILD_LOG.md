@@ -52,7 +52,16 @@ hold more than `ceil(cap / kinds)` of a shared pad.
 
 The pattern: income stopped being the constraint long before the run was won.
 
-## What the script reaches now
+> **Superseded 2026-08-28.** The two sections below are the 2026-08-27
+> measurement, kept for the record; they are no longer what the game does. The
+> arc now closes the IPO at **19.9 sim-minutes** — `state=won`, 250/250 hired,
+> $330,808 banked, 543 alpha made, all twelve techs — and the blocker was a
+> delivery bug in `updateMachine`, not the price table or the research order.
+> See `docs/DESIGN.md` §12b. The ingredient contention found below is real and
+> still stands; what it was masking was a machine whose refused output never
+> left its buffer, which is why no amount of re-ordering or re-pricing moved it.
+
+## What the script reached before the output-drain fix (2026-08-27)
 
 ```
   state=playing at  1.0m hired=0/250   cap=47420  tier=0 min=12 cln=12 ana=2
@@ -64,7 +73,7 @@ The pattern: income stopped being the constraint long before the run was won.
 The economic leg is met and exceeded: **473 hires against a 250 quota**, office
 intact, no margin call, brownout never engaged (`multiplier == 1`).
 
-## The remaining gap, recorded rather than hidden
+## The gap as it stood that day, recorded rather than hidden
 
 `ipo=none`, and `tier=1` at every single minute-sample of a 50-minute run. The
 scripted fund never researches past `fuel-tier-1`, so the alpha economy the
@@ -84,11 +93,16 @@ where it puts a sales desk. §5.5 is the open design question.
   Chromium on the production bundle, and the UI changes it could not previously prove
   (error chip, `?debug` gating, `X` refusing the Fund Office, three-case ending copy)
   are verified with screenshots in `docs/PLAYTEST.md`.
-- `?demo` autoplay was not re-run after the price change; it was written
-  against the old economy.
-- The old README/DESIGN claim "IPO win verified live" was false and has been
-  removed. The win *condition* is covered directly (`src/sim/endings.test.ts`);
-  the economy *route* to it is the unfinished work.
+- ~~`?demo` autoplay was not re-run after the price change~~ Re-run
+  2026-08-28 on the fixed build: the demo rides to **IPO COMPLETE 250/250**
+  in ~9.6 minutes of real time and writes no save (see `docs/PLAYTEST.md`
+  addendum).
+- ~~the economy route to it is the unfinished work~~ Closed: the delivery
+  fix (`a2f82ae`, output drains every tick) plus the logistics fixes of
+  2026-08-28 take the scripted arc to `state=won` at 19.9 sim-minutes with
+  no injected capital. What still owes evidence is a human hand reaching
+  the win overlay in a browser — the harness and the demo have, a person
+  has not.
 
 ## User test and the one revision
 

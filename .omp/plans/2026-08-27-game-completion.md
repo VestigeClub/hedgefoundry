@@ -14,9 +14,9 @@ machine output every tick so the win route opens* (→ P2, and the P3 win state 
 follow-up *Stop the IPO siting from burning the line it means to re-site*. Cite those subjects, not
 shas — history was re-authored after this line was first written and every sha moved once already
 (see the re-authoring block below).
-**P2 met.** The scripted 50-sim-minute arc reports `state=won` at **20.6 min**: 251/250 hired,
-$299,710 in hand, all twelve techs, 18 miners / 12 analytics engines / 7 strategy factories, 563
-alpha made, 95 waves survived. What actually unlocked it was a delivery bug, not balance:
+**P2 met.** The scripted 50-sim-minute arc reports `state=won` at **19.9 min**: 250/250 hired,
+$330,808 in hand, all twelve techs, 18 miners / 12 analytics engines / 7 strategy factories, 543
+alpha made, 94 waves survived. What actually unlocked it was a delivery bug, not balance:
 `updateMachine` pushed a machine's output onto tape only on the tick a craft completed, so a single
 legal refusal — the research desk caps each ingredient at six units, so a seventh alpha is refused —
 stranded those units for the rest of the run, `blocked` never cleared, and the jam walked backwards
@@ -188,12 +188,12 @@ Everything else is untestable until a click does what it looks like.
   2.0–2.6 k $/s, signal 3.3–4.3 k $/s, no brownout) and the arc itself, which cannot win without
   paying the 250-head quota. An older note here quoted "473/250 by the 20th minute"; that arc hired
   past quota, which the win condition does not ask for and which starves the IPO ticket — the
-  current arc stops at 251/250. All of it drives `tickWorld` directly: no DOM, deterministic seed,
+  current arc stops at the quota, 250. All of it drives `tickWorld` directly: no DOM, deterministic seed,
   seconds of runtime.
 - **Exit criteria:** the three economy tests pass and the 50-minute harness reports a completed
   IPO. **Met.** `reachability.test.ts › scripted play reaches the IPO inside the 50-minute window`
-  ends `state=won` at **20.6 sim-minutes** on the player's own map (seed 11), quota paid at the
-  20-minute sample, roadshow fed by one alpha line taken off the market. No capital injected, no
+  ends `state=won` at **19.9 sim-minutes** on the player's own map (seed 11), quota paid and the
+  roadshow closed at that same sample, the IPO fed by one alpha line taken off the market. No
   belt speed pumped, no preconditions handed out. The blocker was never the rates: machine output
   was pushed only on the tick a craft completed, so one legal refusal stranded the units and the
   jam walked backwards through the plant (DESIGN §12b).

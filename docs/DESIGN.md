@@ -369,10 +369,11 @@ payback rows are measured by `src/sim/reachability.test.ts`, not estimated.
 - **What the harness caught, in order**: the run first plateaued at fuel tier
   1, which reads like a research-throughput problem and was not one (§12b:
   delivery, not rates). With that fixed the binding constraints are ground and
-  threat. A straight-row planner gets 18 miner corners on this map, so a fund
-  that spends them on the cheap rungs has no room left for the alpha lines the
-  roadshow needs; and comp paid past the 250-head quota buys nothing but a
-  permanent hole in the cash that buys off the next raid.
+  threat. Laid in straight rows, the map gave the script 21 miner corners before
+  the ground ran out — a fund that spends them on the cheap rungs has no room
+  left for the alpha lines the roadshow needs (the build that wins sits 18
+  miners and 7 factories); and comp paid past the 250-head quota buys nothing
+  but a permanent hole in the cash that buys off the next raid.
 
 ## 12. Milestones (2 weeks, from 2026-08-25)
 - **M1 (d1–2)**: stack up (Vite+TS+Vitest+gate), engine core (loop, camera,
@@ -404,10 +405,10 @@ payback rows are measured by `src/sim/reachability.test.ts`, not estimated.
 - **Proven by simulation** (`src/sim/reachability.test.ts`): each production
   rung is net-positive (clean 2.0–2.6 k $/s on a ten-line farm, signal
   3.3–4.3 k $/s), and a scripted fund — build, defend, expand, hire — pays
-  its 250-head quota, holds the office and **closes the IPO at 20.6 sim
+  its 250-head quota, holds the office and **closes the IPO at 19.9 sim
   minutes** of a 50-minute window: `state=won` with 18 miners, 12 analytics
-  engines and 7 strategy factories, all twelve techs researched, $299 k in
-  hand and 563 alpha made. No capital is injected and no belt speed is
+  engines and 7 strategy factories, all twelve techs researched, $330 k in
+  hand and 543 alpha made. No capital is injected and no belt speed is
   pumped; the script spends only money the panel says it has.
 - **What was actually stopping it**, recorded because the first diagnosis was
   wrong. It was not research throughput and not sales desks buying the lab's

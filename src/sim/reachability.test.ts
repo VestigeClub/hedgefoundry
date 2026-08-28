@@ -398,12 +398,13 @@ const TOWER_SIDES: Dir[] = ["E", "W", "S", "N"];
  *
  * The counts are a ground budget, not a wish list. This planner lays one
  * straight row per chain and refuses any belt that would touch another entity,
- * so it claims patch corners fast and never reclaims them. The measured run
- * filled every corner it could reach (21 miners down) inside four minutes —
- * three minutes before FUEL TIER II unlocks — after which it logged
- * `no ground left` for the alpha chain and could never satisfy its own gate of
- * three factories. Over-building the cheap rung costs the ground for the rich
- * one, so the cheap rungs are capped here.
+ * so it claims patch corners fast and never reclaims them. Run uncapped it
+ * filled every corner it could reach — 21 miners down by 4.0 min, three minutes
+ * before FUEL TIER II even unlocks — and then logged `no ground left` for the
+ * alpha chain at 6.1 min, never reaching its own gate of three factories.
+ * Over-building the cheap rung costs the ground for the rich one, so the cheap
+ * rungs are capped: the build that closes the IPO sits 18 miners, 12 analytics
+ * engines and 7 strategy factories.
  */
 const PROJECTS: Array<{
   kinds: EntityKind[];
