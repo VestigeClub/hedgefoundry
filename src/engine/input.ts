@@ -18,6 +18,7 @@ export class Input {
   readonly keys = new Set<string>();
   mouse = { x: 0, y: 0, left: false, middle: false, right: false };
   private wheelAcc = 0;
+  private saveWanted = false;
   private readonly listeners: Array<() => void> = [];
 
   constructor(private readonly el: HTMLElement) {
@@ -44,6 +45,14 @@ export class Input {
       // Never steal typing from a field, or activation from a focused button.
       if (t?.closest("input,textarea,select,[contenteditable]")) return;
       if (t?.closest("button") && BUTTON_KEYS[e.code]) return;
+      // Ctrl/Cmd+S and Ctrl/Cmd+P are not gameplay: S opens the browser save
+      // dialog mid-run (and KeyS still panned the camera underneath it), P
+      // opens print. S is the player's save instinct — it saves the game.
+      if ((e.ctrlKey || e.metaKey) && (e.code === "KeyS" || e.code === "KeyP")) {
+        e.preventDefault();
+        if (e.code === "KeyS") this.saveWanted = true;
+        return;
+      }
       this.keys.add(e.code);
       if (SCROLL_KEYS[e.code]) e.preventDefault();
     });
@@ -89,6 +98,13 @@ export class Input {
     const w = this.wheelAcc;
     this.wheelAcc = 0;
     return w;
+  }
+
+  /** True once per Ctrl+S press (the same consume-once shape as the wheel). */
+  consumeSaveRequest(): boolean {
+    const s = this.saveWanted;
+    this.saveWanted = false;
+    return s;
   }
 
   dispose(): void {

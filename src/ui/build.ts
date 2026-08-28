@@ -155,20 +155,6 @@ export class BuildController {
     ctx.stroke();
   }
 
-  /** Hover outline on the tile under the cursor when no tool is armed. */
-  drawHover(ctx: CanvasRenderingContext2D): void {
-    if (this.tool) return;
-    const { tx, ty } = this.hoverTile();
-    const z = TILE_SIZE * this.camera.zoom;
-    const x = (tx * TILE_SIZE - this.camera.x) * this.camera.zoom;
-    const y = (ty * TILE_SIZE - this.camera.y) * this.camera.zoom;
-    ctx.strokeStyle = "rgba(0,200,255,0.35)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(x, y, z, z, 3);
-    ctx.stroke();
-  }
-
   private syncBar(): void {
     for (const [i, btn] of [...this.bar.children].entries()) {
       btn.classList.toggle("active", BUILD_ORDER[i]?.kind === this.tool);

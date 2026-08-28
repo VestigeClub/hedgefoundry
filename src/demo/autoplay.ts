@@ -1,6 +1,6 @@
 /**
  * Cinematic demo mode (DESIGN.md §7, M7) — `?demo` URL param.
- * A scripted autoplayer runs the game at 8× sim speed: finds the feed patch
+ * A scripted autoplayer runs the game at 4× sim speed: finds the feed patch
  * nearest the HQ, builds a belt production rig anchored there, grants demo
  * research, defends with towers + briefs, hires bros, and launches the IPO
  * roadshow. No UI interaction needed.

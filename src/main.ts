@@ -21,7 +21,7 @@ import { ResearchPanel } from "./ui/research";
 import { Sound } from "./ui/sound";
 import { renderReport } from "./ui/report";
 import { Demo, demoSpeed } from "./demo/autoplay";
-import type { TileMap } from "./world/tilemap";
+import { TILE_SIZE, type TileMap } from "./world/tilemap";
 import type { FeedPatch } from "./world/mapgen";
 
 // Dev/verification hook: lets browser automation drive and inspect the sim.
@@ -180,6 +180,8 @@ fetchWorldSeed(relayBase()).then((ws) => {
 let lastMouse = { x: 0, y: 0 };
 const PAN_SPEED = 700; // CSS px/s at zoom 1
 let lastSaveMs = 0;
+let lastVoided = 0;
+let lastWasteAt = -Infinity;
 let lastFrameMs = performance.now();
 let prevT = false;
 let prevX = false;
@@ -199,10 +201,22 @@ const loop = new Loop({
       tickWorld(world, dtMs * (demo ? demoSpeed() : 1));
       // Autosave every 10 s of sim time (P&L sampling lives in tickWorld).
       // Time freezes at game over, so this must be state-guarded or it
-      // serializes a finished world every frame.
-      if (world.state === "playing" && world.timeMs - lastSaveMs >= 10_000) {
+      // serializes a finished world every frame. Demo never writes: the
+      // scripted run would overwrite the player's campaign save (audit C1).
+      if (world.state === "playing" && !isDemo && world.timeMs - lastSaveMs >= 10_000) {
         saveToStorage(serializeWorld(world, MAP_OPTS));
         lastSaveMs = world.timeMs;
+      }
+      // Ctrl+S saves now — the player's instinct, and the browser dialog it
+      // used to open is a gameplay interruption (audit C4).
+      if (input.consumeSaveRequest()) {
+        if (world.state === "playing" && !isDemo) {
+          saveToStorage(serializeWorld(world, MAP_OPTS));
+          lastSaveMs = world.timeMs;
+          toast("SAVED");
+        } else {
+          toast(isDemo ? "DEMO — NOTHING TO SAVE" : "RUN OVER — NOTHING TO SAVE");
+        }
       }
     } catch (err) {
       fatal("tick", err);
@@ -259,6 +273,9 @@ function renderFrame(_alpha: number): void {
     demo.update(frameMs);
     demo.frame();
   }
+  // The map is finite; panning past its edge showed only void (clampTo has
+  // been unit-tested since M1 and was never wired up — audit D1).
+  camera.clampTo(MAP_W * TILE_SIZE, MAP_H * TILE_SIZE);
 
   drawMap(ctx, world.map, camera);
   drawImpact(ctx, world, camera);
@@ -267,14 +284,27 @@ function renderFrame(_alpha: number): void {
 
   hud.update(world);
   panel.update();
-
-  // Status chip: wave inbound / IPO ready / capital deficit.
+  // A selected entity killed by a bro used to leave the inspector open on a
+  // ghost forever (audit C3).
+  {
+    const sel = panel.current();
+    if (sel && !world.entities.has(sel.id)) panel.setSelection(null);
+  }
+  // Status chip: capital deficit / wasted output / IPO ready / wave inbound.
   {
     const el = document.querySelector<HTMLElement>("#status-chip")!;
+    const voided = Object.values(world.writtenOff).reduce((a, b) => a + b, 0);
+    if (voided !== lastVoided) {
+      lastVoided = voided;
+      lastWasteAt = nowMs;
+    }
     let msg = "";
     let cls = "";
     if (world.capital < world.demandPerSec * 10) {
       msg = "CAPITAL DEFICIT";
+      cls = "warn";
+    } else if (nowMs - lastWasteAt < 5_000) {
+      msg = "OUTPUT WASTED";
       cls = "warn";
     } else if (world.hired >= HIRE_QUOTA) {
       msg = "IPO READY";
@@ -366,10 +396,13 @@ sizeCanvas();
 loop.start();
 document.querySelector<HTMLElement>("#overlay-btn")!.addEventListener("click", () => {
   clearStorageSave();
-  location.reload();
+  // Leave the URL params behind: reloading `?demo` straight into NEW GAME
+  // restarts the demo forever and the player cannot reach a real run
+  // (audit C2).
+  location.href = location.pathname;
 });
 addEventListener("beforeunload", () => {
-  if (world.state === "playing") saveToStorage(serializeWorld(world, MAP_OPTS));
+  if (world.state === "playing" && !isDemo) saveToStorage(serializeWorld(world, MAP_OPTS));
 });
 // The playtest harness (docs/OPERATIONS.md) drives the game through this
 // handle, so it exists in a dev build or when the page is opened with ?debug.

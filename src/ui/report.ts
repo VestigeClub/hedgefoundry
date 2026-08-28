@@ -55,6 +55,8 @@ export function reportRows(w: World): Array<[string, string]> {
     ["BROS TERMINATED", `${w.brosKilled}`],
     ["TECHS RESEARCHED", `${w.researched.size}`],
   );
+  const voided = Object.values(w.writtenOff).reduce((a, b) => a + b, 0);
+  if (voided > 0) rows.push(["WRITTEN OFF", `${voided}`]);
   for (const type of BRO_TYPES) rows.push([`HIRED · ${BRO_STATS[type].label}`, `${w.hiresByType[type]}`]);
   for (const kind of Object.keys(built) as EntityKind[]) rows.push([KIND_LABEL[kind], `${built[kind]}`]);
   return rows;

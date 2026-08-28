@@ -30,8 +30,6 @@ export interface GenOptions {
   feedPatches?: number;
 }
 
-const FEED_COLORS: readonly string[] = []; // reserved
-
 /**
  * Deterministic map generation: floor + stale-pool clusters (random walks)
  * + data-feed patches (ellipse-ish blobs of Feed tiles with richness).
