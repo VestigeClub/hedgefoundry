@@ -7,6 +7,9 @@ export class Sound {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private muted = false;
+  /** Cue sounds fire from the sim event stream; gate per-voice so a
+   * twenty-bro wave is a crowd, not a stutter-fest. */
+  private readonly lastAt = new Map<string, number>();
 
   /** Must be called from a user gesture at least once (autoplay policy). */
   unlock(): void {
@@ -93,6 +96,7 @@ export class Sound {
   }
 
   broSpawn(): void {
+    if (!this.gated("broSpawn", 350)) return;
     this.tone(200, 0.25, "sawtooth", 0.12, 320);
   }
 
@@ -109,5 +113,51 @@ export class Sound {
   lose(): void {
     const notes = [392, 330, 262, 196];
     notes.forEach((n, i) => setTimeout(() => this.tone(n, 0.3, "sawtooth", 0.2), i * 180));
+  }
+
+  private gated(key: string, ms: number): boolean {
+    const now = performance.now();
+    if (now - (this.lastAt.get(key) ?? -1e9) < ms) return false;
+    this.lastAt.set(key, now);
+    return true;
+  }
+
+  /** Bro hits a machine / machine shoots: tiny dry tick. */
+  hit(): void {
+    if (!this.gated("hit", 90)) return;
+    this.tone(950, 0.04, "square", 0.06, 700);
+  }
+
+  /** Something died: low thud + debris. */
+  death(): void {
+    if (!this.gated("death", 70)) return;
+    this.noise(0.18, 0.3, 900);
+    this.tone(120, 0.18, "sawtooth", 0.22, 50);
+  }
+
+  /** Player demolition: gravel. */
+  demolish(): void {
+    if (!this.gated("demolish", 100)) return;
+    this.noise(0.22, 0.22, 450);
+  }
+
+  /** Wave inbound: two-tone siren from the office. */
+  wave(): void {
+    if (!this.gated("wave", 1_000)) return;
+    this.tone(740, 0.18, "square", 0.18, 660);
+    setTimeout(() => this.tone(560, 0.22, "square", 0.18, 480), 200);
+  }
+
+  /** A desk's money arrives: bright short coin. */
+  sale(): void {
+    if (!this.gated("sale", 500)) return;
+    this.tone(1320, 0.07, "sine", 0.1, 1760);
+  }
+
+  /** Margin call approaching: klaxon, two passes. */
+  alarm(): void {
+    if (!this.gated("alarm", 3_000)) return;
+    this.tone(300, 0.5, "sawtooth", 0.3, 220);
+    setTimeout(() => this.tone(300, 0.5, "sawtooth", 0.3, 220), 380);
   }
 }

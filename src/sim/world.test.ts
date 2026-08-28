@@ -280,3 +280,62 @@ describe("determinism", () => {
     expect(JSON.stringify([...a.entities.values()])).toBe(JSON.stringify([...b.entities.values()]));
   });
 });
+
+describe("fx cues", () => {
+  it("place, hire, demolish and kill each emit their cue with position + amount", () => {
+    const w = makeWorld(7, 200_000);
+    w.spawnHQ(); // the wave cue is anchored on the office
+    w.fx.length = 0;
+    const spot = findSpot(w, "cleaner", 30, 30);
+    const c = w.placeEntity("cleaner", spot.x, spot.y)!;
+    let last = w.fx.at(-1)!;
+    expect(last.kind).toBe("place");
+    expect(last.x).toBe(c.x + c.w / 2); // the cue sits on the entity center
+    expect(last.v).toBeGreaterThan(0);
+
+    w.removeEntity(c.id);
+    expect(w.fx.at(-1)!.kind).toBe("demolish");
+
+    tick(w, 100); // a wave lands: wave cue before its spawn cues
+    expect(w.fx.some((c2) => c2.kind === "wave")).toBe(true);
+    const bro = [...w.entities.values()].find((e) => e.kind === "bro");
+    expect(bro).toBeDefined();
+    w.fx.length = 0;
+    expect(w.hireBro(bro!.id)).toBe(true);
+    expect(w.fx.at(-1)!.kind).toBe("hire");
+    expect(w.fx.at(-1)!.v).toBeGreaterThan(0);
+
+    const bro2 = [...w.entities.values()].find((e) => e.kind === "bro")!;
+    w.fx.length = 0;
+    bro2.hp = 1;
+    w.damageEntity(bro2.id, 1);
+    const death = w.fx.at(-1)!;
+    expect(death.kind).toBe("death");
+    expect(Math.abs(death.x - bro2.bro!.xf)).toBeLessThan(1.5);
+  });
+
+  it("funding desks float one +$N per 700 ms of real income, never per tick", () => {
+    const w = makeWorld(7, 100_000);
+    const f = w.feeds[0]!;
+    const fundingSpot = findSpot(w, "funding", f.x + 10, f.y, 6);
+    const funding = w.placeEntity("funding", fundingSpot.x, fundingSpot.y)!;
+    bufferAdd(funding.funding!.input, "clean", 8); // one gulp = 0.2 s of burn
+    w.fx.length = 0;
+    tick(w, 1);
+    let sales = w.fx.filter((c) => c.kind === "sale");
+    expect(sales.length).toBe(1); // one pop for the whole gulp, not 6 ticks
+    bufferAdd(funding.funding!.input, "clean", 40);
+    tick(w, 1.5);
+    sales = w.fx.filter((c) => c.kind === "sale");
+    // the 40-clean burn lasts >1.4 s: one or two more pops, never one per tick
+    expect(sales.length).toBeGreaterThanOrEqual(2);
+    expect(sales.length).toBeLessThanOrEqual(4);
+    expect(sales.every((c) => (c.v ?? 0) >= 1)).toBe(true);
+  });
+
+  it("cue queue is capped: a massacre cannot grow it unbounded", () => {
+    const w = makeWorld(7);
+    for (let i = 0; i < 500; i++) w.cue("hit", i, 0);
+    expect(w.fx.length).toBe(128);
+  });
+});

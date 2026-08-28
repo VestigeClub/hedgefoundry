@@ -45,6 +45,28 @@ export interface BeltItem {
   pos: number;
 }
 
+/** Transient render cues: the sim names the event, the renderer animates it.
+ * (x, y) are tile coords; drained by main every frame and never saved. */
+export type FxCueKind =
+  | "place"
+  | "demolish"
+  | "hit"
+  | "death"
+  | "spawn"
+  | "hqhit"
+  | "wave"
+  | "hire"
+  | "sale"
+  | "void"
+  | "alarm";
+export interface FxCue {
+  kind: FxCueKind;
+  x: number;
+  y: number;
+  /** Amount; per kind: $ (sale/hire), bro count (wave), cost (place). */
+  v?: number;
+}
+
 export interface Entity {
   id: number;
   kind: EntityKind;
@@ -56,7 +78,13 @@ export interface Entity {
   /** Captured research target while the desk crafts (research machines). */
   researchTarget?: string | null;
   miner?: { output: Buffer; rateAcc: number };
-  funding?: { input: Buffer; selling: Item | null };
+  funding?: {
+    input: Buffer;
+    selling: Item | null;
+    /** Float-text throttle: $ accrued since the last "+$N" popped. Runtime only. */
+    floatAcc?: number;
+    floatAtMs?: number;
+  };
   belt?: { dir: Dir; speed: number; items: BeltItem[]; jamMs?: number };
   trader?: { dir: Dir; cooldownMs: number; busyMs: number };
   /** Generic input buffer (tower ammo, roadshow alpha). */
@@ -203,6 +231,8 @@ export class World {
   private workingPrev = new Set<number>();
   broSpawnTimerMs = 60_000;
   hqId = -1;
+  /** Transient render cues; drained every frame, never saved, capped. */
+  fx: FxCue[] = [];
 
   constructor(opts: WorldOpts) {
     this.map = opts.map;
@@ -264,6 +294,11 @@ export class World {
   logEvent(msg: string): void {
     this.timeline.push({ t: this.timeMs, msg });
     if (this.timeline.length > 200) this.timeline.shift();
+  }
+
+  /** Queue a render cue, capped: a bro massacre must never grow the queue. */
+  cue(kind: FxCueKind, x: number, y: number, v?: number): void {
+    if (this.fx.length < 128) this.fx.push({ kind, x, y, v });
   }
 
   /** Point the Research Desk at a tech; resets progress on change. Re-asking
@@ -353,6 +388,7 @@ export class World {
     this.capital -= COSTS[kind];
     this.entities.set(e.id, e);
     if (kind === "hq") this.hqId = e.id;
+    this.cue("place", tx + s / 2, ty + s / 2, COSTS[kind]);
     return e;
   }
 
@@ -370,6 +406,7 @@ export class World {
     const stats = BRO_STATS[type];
     const e: Entity = { id: this.nextId++, kind: "bro", x: tx, y: ty, w: 1, h: 1, hp: stats.hp, maxHp: stats.hp, bro: { type, atkCdMs: 0, xf: tx + 0.5, yf: ty + 0.5 } };
     this.entities.set(e.id, e);
+    this.cue("spawn", tx + 0.5, ty + 0.5);
     return e;
   }
 
@@ -384,6 +421,7 @@ export class World {
     this.entities.delete(id);
     this.hired += 1;
     this.hiresByType[e.bro!.type] += 1;
+    this.cue("hire", e.bro!.xf, e.bro!.yf, cost);
     if (this.hired % 50 === 0) this.logEvent(`HIRED ${this.hired}`);
     return true;
   }
@@ -396,6 +434,7 @@ export class World {
     if (e.kind !== "bro") {
       this.capital = Math.min(this.capitalCapacity(), this.capital + Math.round(COSTS[e.kind] * 0.5));
     }
+    this.cue("demolish", e.x + e.w / 2, e.y + e.h / 2);
     return true;
   }
 
@@ -411,8 +450,16 @@ export class World {
     const e = this.entities.get(id);
     if (!e || e.hp === undefined) return false;
     e.hp -= dmg;
+    const isBro = e.kind === "bro";
+    const cx = isBro ? e.bro!.xf : e.x + e.w / 2;
+    const cy = isBro ? e.bro!.yf : e.y + e.h / 2;
     if (e.hp <= 0) {
-      if (e.kind === "bro") this.brosKilled++;
+      if (isBro) {
+        this.brosKilled++;
+        this.cue("death", cx, cy);
+      } else {
+        this.cue(e.kind === "hq" ? "hqhit" : "hit", cx, cy);
+      }
       if (e.kind === "hq") {
         this.state = "lost";
         this.lossReason = "hq";
@@ -421,6 +468,7 @@ export class World {
       this.entities.delete(id);
       return true;
     }
+    this.cue("hit", cx, cy);
     return false;
   }
 

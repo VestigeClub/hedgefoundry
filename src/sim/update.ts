@@ -84,7 +84,16 @@ function updateFunding(w: World, e: Entity, dtMs: number): void {
     bufferTake(buf, fuel.fuel, taken);
     f.selling = fuel.fuel;
     w.working.add(e.id);
-    w.capital = Math.min(w.capitalCapacity(), w.capital + fuel.capPerSec * dt * (taken / want));
+    const gained = fuel.capPerSec * dt * (taken / want);
+    w.capital = Math.min(w.capitalCapacity(), w.capital + gained);
+    // "+$N" floats: one pop per desk per 700 ms, min $1, so a 30-tick
+    // income stream reads as money arriving, never as a strobe.
+    f.floatAcc = (f.floatAcc ?? 0) + gained;
+    if ((f.floatAcc ?? 0) >= 1 && w.timeMs - (f.floatAtMs ?? 0) >= 700) {
+      w.cue("sale", e.x + e.w / 2, e.y + 0.2, Math.round(f.floatAcc));
+      f.floatAcc = 0;
+      f.floatAtMs = w.timeMs;
+    }
     return;
   }
 }
@@ -256,6 +265,7 @@ function updateBelt(w: World, e: Entity, dtMs: number): void {
         items.pop();
         b.jamMs = 0;
         w.writtenOff[it.item] += 1;
+        w.cue("void", e.x + 0.5, e.y + 0.5);
         if (w.timeMs - w.lastWasteLogMs >= 10_000) {
           w.lastWasteLogMs = w.timeMs;
           w.logEvent(`WROTE OFF STRANDED ${it.item.toUpperCase()}`);
@@ -509,6 +519,8 @@ function spawnBros(w: World, dtMs: number): void {
   if (spawned > 0) {
     w.waves += 1;
     w.logEvent(`WAVE ${w.waves} · ${spawned} BROS`);
+    const hq = w.entities.get(w.hqId);
+    w.cue("wave", hq ? hq.x + 2 : w.map.w / 2, hq ? hq.y + 2 : w.map.h / 2, spawned);
   }
   w.broSpawnTimerMs = Math.max(4_000, 20_000 - w.evolution * 10_000);
 }
@@ -719,6 +731,12 @@ function updateRoadshow(w: World, e: Entity, dtMs: number): void {
 function checkMarginCall(w: World, dtMs: number): void {
   if (w.capital <= 0) {
     w.marginCallMs += dtMs;
+    // One klaxon per episode the moment deficit passes 4 s — the player
+    // gets a fighting chance to see WHY the screen is bleeding red.
+    if (w.marginCallMs >= 4_000 && w.marginCallMs - dtMs < 4_000) {
+      const hq = w.entities.get(w.hqId);
+      if (hq) w.cue("alarm", hq.x + 2, hq.y + 2);
+    }
     if (w.marginCallMs >= 10_000) {
       w.state = "lost";
       w.lossReason = "margin";

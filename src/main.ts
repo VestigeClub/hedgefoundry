@@ -8,9 +8,10 @@ import { Input } from "./engine/input";
 import { Loop } from "./engine/loop";
 import { drawMap, drawImpact } from "./engine/renderer";
 import { drawEntities } from "./engine/entity-render";
+import { Fx } from "./engine/fx";
 import { FeedClient, fetchWorldSeed, relayBase } from "./market/feed";
 import { generateMap } from "./world/mapgen";
-import { HIRE_QUOTA, World } from "./sim/world";
+import { HIRE_QUOTA, World, type FxCue } from "./sim/world";
 import { tickWorld } from "./sim/update";
 import { serializeWorld, deserializeWorld, saveToStorage, loadFromStorage, clearStorageSave } from "./sim/save";
 import { Ticker } from "./ui/ticker";
@@ -35,6 +36,7 @@ declare global {
       demo?: Demo;
       tick?: (dtMs: number) => void;
       frame?: () => void;
+      fx?: Fx;
     };
   }
 }
@@ -144,6 +146,84 @@ const sound = new Sound();
 addEventListener("pointerdown", () => sound.unlock());
 addEventListener("keydown", () => sound.unlock());
 
+/** Screen effects: fed by World.fx cues drained once per rendered frame. */
+const fx = new Fx();
+const CUE_COLORS: Record<FxCue["kind"], string> = {
+  place: "#00e68c",
+  demolish: "#8b93a5",
+  hit: "#fb7185",
+  hqhit: "#fb7185",
+  death: "#ff2d55",
+  spawn: "#ff9e2c",
+  wave: "#ff9e2c",
+  hire: "#00e68c",
+  sale: "#00e68c",
+  void: "#ff2d55",
+  alarm: "#ff9e2c",
+};
+
+/**
+ * Turn sim cues into particles, floats, shake and sound. Cues carry tile
+ * coordinates; effects live in world pixels (tile center = (x+0.5)*32).
+ */
+function drainCues(): void {
+  for (const c of world.fx) {
+    const wx = (c.x + 0.5) * 32;
+    const wy = (c.y + 0.5) * 32;
+    const col = CUE_COLORS[c.kind];
+    switch (c.kind) {
+      case "place":
+        fx.burst(wx, wy, col, 7, 60, 420, 2.5);
+        if (isDemo) sound.place();
+        break;
+      case "demolish":
+        fx.burst(wx, wy, col, 10, 90, 520);
+        sound.demolish();
+        break;
+      case "hit":
+        fx.burst(wx, wy, col, 4, 70, 260, 2);
+        sound.hit();
+        break;
+      case "hqhit":
+        fx.burst(wx, wy, col, 9, 110, 420, 3);
+        fx.addTrauma(0.35);
+        sound.hit();
+        break;
+      case "death":
+        fx.burst(wx, wy, col, 16, 150, 620, 3);
+        fx.addTrauma(0.12);
+        sound.death();
+        break;
+      case "spawn":
+        fx.ring(wx, wy, col, 26, 520, 2);
+        sound.broSpawn();
+        break;
+      case "wave":
+        fx.ring(wx, wy, col, 90, 900, 3);
+        fx.addTrauma(0.25);
+        sound.wave();
+        break;
+      case "hire":
+        fx.floatText(`HIRE -$${Math.round(c.v ?? 0)}`, col, wx, wy);
+        fx.ring(wx, wy, col, 34, 600, 2);
+        sound.hire();
+        break;
+      case "sale":
+        fx.floatText(`+$${Math.round(c.v ?? 0)}`, col, wx, wy, 750);
+        sound.sale();
+        break;
+      case "void":
+        fx.burst(wx, wy, col, 6, 55, 700, 2);
+        break;
+      case "alarm":
+        fx.addTrauma(0.6);
+        sound.alarm();
+        break;
+    }
+  }
+  world.fx.length = 0;
+}
+
 const build = new BuildController(
   world,
   camera,
@@ -163,8 +243,6 @@ const demo = isDemo ? new Demo(world, camera) : null;
 
 // M6: audio events via per-frame deltas (sim stays pure).
 let lastTotals = { ...world.totals };
-let lastBroCount = 0;
-let lastHired = 0;
 let lastTowerAmmo = 0;
 let lastWarningAt = -Infinity;
 let lastCraftSoundAt = 0;
@@ -279,10 +357,16 @@ function renderFrame(_alpha: number): void {
   // been unit-tested since M1 and was never wired up — audit D1).
   camera.clampTo(MAP_W * TILE_SIZE, MAP_H * TILE_SIZE);
 
+  drainCues();
+  fx.update(frameMs);
+  ctx.save();
+  ctx.translate(fx.shakeX, fx.shakeY);
   drawMap(ctx, world.map, camera);
   drawImpact(ctx, world, camera);
   drawEntities(ctx, world, camera, world.timeMs);
+  ctx.restore();
   build.drawGhost(ctx);
+  fx.draw(ctx, camera);
 
   hud.update(world);
   panel.update();
@@ -332,11 +416,6 @@ function renderFrame(_alpha: number): void {
       }
     }
     lastTotals = { ...world.totals };
-    const bros = [...world.entities.values()].filter((e) => e.kind === "bro").length;
-    if (bros > lastBroCount) sound.broSpawn();
-    lastBroCount = bros;
-    if (world.hired > lastHired) sound.hire();
-    lastHired = world.hired;
     let towerAmmo = 0;
     for (const e of world.entities.values()) if (e.kind === "tower") towerAmmo += e.input?.items.brief ?? 0;
     if (towerAmmo < lastTowerAmmo) sound.towerShot();
@@ -418,5 +497,6 @@ if (import.meta.env.DEV || new URLSearchParams(location.search).has("debug")) {
     demo: demo ?? undefined,
     tick: (dtMs) => tickWorld(world, dtMs),
     frame: () => renderFrame(0),
+    fx,
   };
 }
