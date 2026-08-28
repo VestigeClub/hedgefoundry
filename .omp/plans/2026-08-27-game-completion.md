@@ -42,9 +42,9 @@ P6 push is a delete-and-recreate or a `--force-with-lease` (never bare `--force`
 that pushes first must make it fail, not get overwritten). Shas quoted above have now moved twice;
 current equivalents, each matched **by tree hash** rather than by narrative: `904a78c` → `fdfd2b1`,
 `4ec3a83` → `0f2a907`, and the published tip `e21150f` (same content as `5690a0f`) → `9c27165`.
-The superseded line is **no longer tagged** — tag `pre-rewrite` and `.scratch/pre-rewrite.bundle`
-from the earlier draft of this paragraph no longer exist; that chain lives only in
-`.scratch/leaked-chain-archive.bundle` (gitignored, off-repo). Every commit on it, including
+The superseded line is **no longer tagged** — neither `pre-rewrite` nor its bundle from the earlier
+draft of this paragraph exists any more; that chain survives only in a **local archive bundle outside
+the published tree** (head `98e7395`, listed by `git bundle list-heads`). Every commit on it, including
 `58534da`, `7799e24`, `98e7395`, `814aeb5`, was then re-checked: each has an identical tree
 somewhere in the current chain, so no range choice during the rewrite dropped a commit.
 
@@ -52,11 +52,11 @@ somewhere in the current chain, so no range choice during the rewrite dropped a 
 pass reworded messages only; the internal product/host strings were also in *tracked file contents*
 of 14 commits (`AGENTS.md`, `README.md`, `docs/DESIGN.md`, `server/relay.mjs`, `src/market/types.ts`).
 All 29 commits were rebuilt again with `git commit-tree`, this time writing each revision into a
-scratch worktree, running `.scratch/scrub.mjs` over it, and re-adding before `write-tree`, so the
+scratch worktree, running a local scrubber over it, and re-adding before `write-tree`, so the
 old blobs are unreachable. The scrubber's rules take their wording from the replacements HEAD
 already made, so history converges on text the tip already uses.
 
-Verified, not assumed: `.scratch/gate.sh` rebuilds a known-dirty revision and **fails the pass
+Verified, not assumed: a fail-closed gate script rebuilds a known-dirty revision and **fails the pass
 unless the tree changes** (it did: `f505bb5a` → `c91545e7`), which proves the loop is live rather
 than a no-op; `git grep` for the internal tokens is empty in **every tree** of the chain; every
 commit message scores `residual_lines=0`; every commit — the 29 rebuilt ones and the docs commits
@@ -66,7 +66,7 @@ the tip** — `pre-attn^{tree}` and the rebuilt tip tree are both `50ebe4ce`. Pe
 15/14 split below: most revisions kept their tree exactly, 14 were rewritten by the scrub alone.
 Bodies came from 21 parallel readers, one per bodyless commit, each restricted to that commit's own diff.
 
-`.scratch/pairs.mjs` prints the pairing itself rather than asserting it: pairing all 29 `pre-attn`
+A pairing-audit script prints the pairing itself rather than asserting it: pairing all 29 `pre-attn`
 commits to their `HEAD` twins by author-date + subject gives **15 tree-identical pairs, 14 pairs with
 differing trees, 0 unmatched**, and every one of those 14 deltas touches only the five scrubbed paths
 (file counts 1–5, nothing outside them) — so the scrub is the whole explanation for every tree change.
@@ -77,9 +77,12 @@ the `.scratch/` rule at
 `docs/OPERATIONS.md:75`, the `browser.relay`-precedes-`browser.headless` root cause at `:183`/`:192`,
 and `deploy.yml` / `LICENSE` / `public/favicon.svg` / `docs/BUILD_LOG.md` all tracked. Nothing was lost.
 
-Backups, both `git bundle verify`-clean: `.scratch/current-chain-backup.bundle` (`main` + tag
-`pre-attn`) and `.scratch/leaked-chain-archive.bundle` (the pre-scrub chain, kept only as an
-off-repo archive — nothing references it by ref, so no `--tags` or `--follow-tags` push can publish it).
+Backups are **local untracked archives, deliberately outside this repository**, so their paths are not
+browsable here; both are `git bundle verify`-clean. One pins the published `main` together with the
+pre-attribution tip `219bd58` (its own head, `refs/tags/pre-attn`, listed by `git bundle list-heads`);
+the other keeps the pre-scrub chain purely as an archive: no ref in this repository points at it, so
+no `--tags` or `--follow-tags` push can publish it. The local tag `pre-attn` was deleted after the push
+for exactly that reason — recovery goes through the archive, never through a ref.
 
 ## Decisions (locked by owner)
 
