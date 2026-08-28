@@ -136,3 +136,28 @@ if (err) {
    load; 181 frames/s was measured on a five-machine plant, not a 50-minute end state.
 4. Live-feed UI is not shipped yet (`.omp/plans/2026-08-27-game-completion.md` P5), so
    the tape pool shown here is the simulated feed.
+
+## Addendum — 2026-08-28, the fixed build (`index-BtFhA4PW.js`, 67.40 kB, 131 tests)
+
+The audit fixes of 2026-08-28 (`59b1dd7`, `496420d`) each got a live check on
+the running game, headless Chromium at 1440×900, `?debug`/`?demo&debug`:
+
+| Check | Result |
+|---|---|
+| Demo reaches the win overlay **in a browser** | **PASS** — `state=won`, `IPO COMPLETE — YOU'RE THE FUND`, 250/250 hired, 9m 38s at demo pacing; below |
+| Demo writes no save (the C1 trap: 13 s of demo clobbered a campaign) | **PASS** — `localStorage` still empty after the full ride |
+| NEW GAME from the demo returns to a fresh campaign | **PASS** — URL `/`, capital 400,000, no scripted state |
+| Ctrl/Cmd+S saves on the player's instinct | **PASS** — default swallowed, `hedgefoundry-save-v2` written, `SAVED` toast |
+| Status chip is click-through | **PASS** — hit-test under the chip returns the canvas |
+| Camera cannot leave the plot | **PASS** — `clampTo` exact at the cap (7509.5 px) |
+| Dead-end lane drains instead of jamming forever | **PASS** — item written off, `OUTPUT WASTED` chip, counted in the report; a sink rebuilt on the tile delivers next tick |
+| Inspector closes when the inspected entity dies | **PASS** |
+
+![Win overlay in the browser](playtest/05-ipo-overlay.webp)
+
+Two observations, recorded not fixed: the demo report reads `BRO WAVES
+SURVIVED 0` and `TECHS RESEARCHED 5` because the autoplay rig hires every bro
+on sight and researches a shortlist — those rows are the demo's, not the
+scripted arc's (94 waves, twelve techs). And the graded debt this addendum
+does **not** pay: it is still scripted input. A human hand has reached the win
+overlay via the demo, not by playing there; limitation 1 above stands.
