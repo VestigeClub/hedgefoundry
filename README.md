@@ -4,8 +4,14 @@ Factorio, but you run a hedge fund. A school assignment: mine market data,
 process signals, assemble trading strategies, defend against finance bros,
 and hit your hiring quota to IPO.
 
-Status: **M1–M7 shipped.** TypeScript strict + Vite + Vitest, gate
-`npm run check` green (117 tests). Full design in `docs/DESIGN.md`.
+Play it now: **https://vestigeclub.github.io/hedgefoundry/** — current `main`,
+built and deployed by GitHub Actions on every push. No install, no server.
+
+Status: **M1–M6 shipped; M7 (the IPO win route) is still open.** TypeScript
+strict + Vite + Vitest; gate `npm run check` green (**124 tests**, 17 files).
+M7 is stated as open because it is measured that way: the scripted 50-sim-minute
+arc samples `ipo=none` at every point, and an earlier "win verified live" claim
+was withdrawn — see `docs/BUILD_LOG.md:89-91`. Full design in `docs/DESIGN.md`.
 
 ## Play
 
