@@ -28,6 +28,7 @@ interface SaveFormat {
     positions?: Position[];
     positionLog?: ClosedPosition[];
     nextPositionId?: number;
+    events?: { fired: Record<string, boolean>; richnessMult: number; richnessMultUntil: number; fuelPriceMult: number; fuelPriceMultUntil: number };
     totals: Record<string, number>;
     /** Added with the void rule; absent in saves written before it → zeros. */
     writtenOff?: Record<string, number>;
@@ -156,6 +157,7 @@ export function serializeWorld(w: World, mapOpts: MapGenOpts, tutorial?: { step:
       positions: w.positions.map((p) => ({ ...p })),
       positionLog: w.positionLog.map((p) => ({ ...p })),
       nextPositionId: w.nextPositionId,
+      events: { fired: { ...w.events.fired }, richnessMult: w.events.richnessMult, richnessMultUntil: w.events.richnessMultUntil, fuelPriceMult: w.events.fuelPriceMult, fuelPriceMultUntil: w.events.fuelPriceMultUntil },
       totals: { ...w.totals },
       writtenOff: { ...w.writtenOff },
       tech: { ...w.tech },
@@ -218,6 +220,9 @@ export function deserializeWorld(json: string): { world: World; map: TileMap; fe
   w.positions = (save.world.positions ?? []).map((p) => ({ ...p }));
   w.positionLog = (save.world.positionLog ?? []).map((p) => ({ ...p }));
   w.nextPositionId = save.world.nextPositionId ?? 1;
+  w.events = save.world.events
+    ? { fired: { ...save.world.events.fired }, richnessMult: save.world.events.richnessMult, richnessMultUntil: save.world.events.richnessMultUntil, fuelPriceMult: save.world.events.fuelPriceMult, fuelPriceMultUntil: save.world.events.fuelPriceMultUntil }
+    : { fired: {} as Record<string, boolean>, richnessMult: 1, richnessMultUntil: 0, fuelPriceMult: 1, fuelPriceMultUntil: 0 };
   w.hqId = save.world.hqId;
   w.lossReason = save.world.lossReason;
   w.brosKilled = save.world.brosKilled;

@@ -246,6 +246,8 @@ export class World {
   positions: Position[] = [];
   positionLog: ClosedPosition[] = [];
   nextPositionId = 1;
+  // Scripted market events (§5.11): fire-once flags + active multipliers.
+  events = { fired: {} as Record<string, boolean>, richnessMult: 1, richnessMultUntil: 0, fuelPriceMult: 1, fuelPriceMultUntil: 0 };
 
   constructor(opts: WorldOpts) {
     this.map = opts.map;

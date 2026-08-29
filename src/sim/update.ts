@@ -12,6 +12,7 @@ import { acceptsItem, bufferAdd, bufferCount, bufferTake, inputBufferOf, isTermi
 import { sellableFuels } from "./recipes";
 import { TECH_BY_ID, applyTech } from "./research";
 import { updatePositions } from "./positions";
+import { updateEvents } from "./events";
 
 export function tickWorld(w: World, dtMs: number): void {
   if (w.state !== "playing") return; // game over: freeze the sim
@@ -64,6 +65,7 @@ export function tickWorld(w: World, dtMs: number): void {
     }
   }
   spawnBros(w, dtMs);
+  updateEvents(w, dtMs);
   updatePositions(w);
   updateBros(w, dtMs);
 }
@@ -86,7 +88,7 @@ function updateFunding(w: World, e: Entity, dtMs: number): void {
     bufferTake(buf, fuel.fuel, taken);
     f.selling = fuel.fuel;
     w.working.add(e.id);
-    const gained = fuel.capPerSec * dt * (taken / want);
+    const gained = fuel.capPerSec * dt * (taken / want) * w.events.fuelPriceMult;
     w.capital = Math.min(w.capitalCapacity(), w.capital + gained);
     // "+$N" floats: one pop per desk per 700 ms, min $1, so a 30-tick
     // income stream reads as money arriving, never as a strobe.
@@ -111,7 +113,7 @@ const MINER_BASE_RATE = 4;
 function updateMiner(w: World, e: Entity, dtMs: number): void {
   if (!w.powered.has(e.id)) return;
   const m = e.miner!;
-  const richness = w.feedAt(e.x, e.y)?.richness ?? 0;
+  const richness = (w.feedAt(e.x, e.y)?.richness ?? 0) * w.events.richnessMult;
   if (richness <= 0) return; // placed off-patch: idle (shouldn't happen; canPlace guards)
   // Drain into belts first. A miner whose output has nowhere to go produces
   // nothing — and banks nothing, so a jam cannot pay out a burst when it clears.
@@ -533,7 +535,7 @@ function countBros(w: World): number {
   return n;
 }
 
-function broTypeFor(w: World): BroType {
+export function broTypeFor(w: World): BroType {
   const r = w.rng.float();
   if (w.evolution > 0.8 && r < 0.15) return "quant";
   if (w.evolution > 0.4 && r < 0.4) return "md";
