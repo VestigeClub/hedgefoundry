@@ -390,7 +390,7 @@ function renderFrame(_alpha: number): void {
   // Tutorial: check triggers at its own throttle, patch the card, resolve the
   // ring target for this frame (DESIGN.md §8a).
   let tutorialTarget: TutorialRect | null = null;
-  if (tutorial && tutorialCard) {
+  if (tutorial && tutorialCard && world.state === "playing") {
     const moved = tutorialHome
       ? Math.abs(camera.x - tutorialHome.x) + Math.abs(camera.y - tutorialHome.y) > 16
       : false;
@@ -500,6 +500,10 @@ function renderFrame(_alpha: number): void {
 
   // Game over overlay + end-game report.
   if (world.state !== "playing") {
+    // The card must not bleed through the game-over overlay or re-show
+    // beneath it (audit B2). The tutorial block above skips finished runs;
+    // this hides the card the frame the run ends.
+    tutorialCard?.hide();
     const overlay = document.querySelector<HTMLElement>("#overlay")!;
     overlay.classList.add("show");
     const title = document.querySelector<HTMLElement>("#overlay-title")!;
