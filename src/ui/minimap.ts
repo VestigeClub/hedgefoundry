@@ -70,6 +70,7 @@ export class Minimap {
   private prerender(): void {
     if (!this.buffer) return;
     const bctx = this.buffer.getContext("2d");
+    if (!bctx) return;
     const map: TileMap = this.world.map;
     const s = BUFFER / map.w; // px per tile
     bctx.fillStyle = PALETTE.bg;
