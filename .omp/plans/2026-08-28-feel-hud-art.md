@@ -2,7 +2,7 @@
 
 Status: A feel 7e30cba · B world art 6f12508 · C HUD 0183b13 · remaining: gate re-verify, push question, punch-list mode
 
-Brief (Zain, 2026-08-28): "nothing looks or feels different." Selected ALL:
+Brief (owner, 2026-08-28): "nothing looks or feels different." Selected ALL:
 game feel, HUD rebuild, world art, then punch-list mode. Impeccable route:
 scoped-existing enhancement — the pinned world stays **quant terminal dark**
 (DESIGN.md §8); we amplify it, never replace it.
@@ -44,7 +44,7 @@ scoped-existing enhancement — the pinned world stays **quant terminal dark**
    chips, dial, affordability dimming, browser surfaces. Existing DOM tests
    (build/panel/report) must keep passing.
 4. **Finish** — full `npm run check`, live screenshot pass, push question,
-   punch-list mode (Zain fires gripes, each fixed same-session).
+   punch-list mode (the owner fires gripes, each fixed same-session).
 
 ## Non-goals
 

@@ -36,7 +36,7 @@ running game this session; **STATIC** = code-verified, not reproduced live.
 - Undefended HQ dies to waves ~4.3 sim-min in. LIVE (pace note, not a defect —
   PLAYTEST P0 passed with humans).
 
-## Decisions needed from Zain before Phase A (defaults in bold)
+## Decisions needed from the owner before Phase A (defaults in bold)
 
 1. **Void policy for items whose sink died** — belt head with no target:
    **void to ground after ~2 sim-s with a ticker "WASTE" note + written-off
