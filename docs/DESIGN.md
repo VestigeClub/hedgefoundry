@@ -223,6 +223,28 @@ desk moves on. Desk idles without a target. Current tree (12 techs):
   it preferentially; HP 500; destroyed → defeat screen.
 - Both screens show the report + `NEW GAME` / `LOAD`.
 
+### 5.10 Trading Desk & Positions
+- **Trading Desk** (2×2): cost $30k, unlocked by the **POSITIONS DESK** tech
+  (`positions-1`). No recipe — a service building; ALWAYS_ON off; works only
+  while powered.
+- **Positions** on BTC/ETH/SOL at $50k fixed size, priced off the live tape.
+  pnl = long: `size × (px/entry − 1)`, short: `size × (1 − px/entry)`.
+  Margin is debited at open; the position auto-closes after 5 sim-min (or
+  closes manually at the current price); max 5 open. Every close adds
+  +2 Impact — the desk leaks like every machine.
+- Losses are real: a bad position can zero the fund and start the
+  margin-call path (§5.9).
+
+### 5.11 Scripted market events
+One-time, keyed on sim time, in all modes (class or not):
+- **6 sim-min — SHORT RAID**: bro wave timer resets and 5 extra bros spawn at
+  the map edges.
+- **12 sim-min — FLASH CRASH**: every Data Feed patch richness ×0.7 for
+  60 sim-s.
+- **18 sim-min — RALLY**: fuel prices +25% for 60 sim-s (funding desks pay
+  more for what they sell).
+Each event lands on the end-game report timeline with a toast.
+
 ## 6. Live market integration (the wow) — read-only desk relay
 
 Source: a **user-supplied market-data server**, addressed entirely by
@@ -299,7 +321,9 @@ client uses its fixed sim seed values — no server needed anywhere.
   - Bottom: build menu (hotkeys 1–9), status line (`CAPITAL DEFICIT`,
     `WAVE INBOUND`, `IPO READY`).
   - Right: selected-entity panel (recipe, buffers, grid status).
-  - Minimap (top-left, 96px).
+  - Minimap (top-left, 96px, click-to-jump).
+  - Speed chip (`PAUSED`/`1×`/`2×`/`4×`, keys Space/`-`/`=`); help overlay
+    (H); stats panel (S).
   - `LIVE`/`SIM` chip top-right; `v0.x` build chip.
 - Zoom 0.5–3, pan with WASD/edge/middle-drag, tile highlight hover.
 
@@ -455,10 +479,14 @@ payback rows are measured by `src/sim/reachability.test.ts`, not estimated.
   ticks twice. The reachability arc is the case that earns all four.
 - **Cross-platform**: any browser opens `http://<host>:7891` (relay serves
   `dist/`); zero install. macOS browser check pending.
+- **2026-08-29 gap-closure pass** (chrome + depth, per §5.10/§5.11):
+  pause/speed keys, minimap click-to-jump, stats panel (S), persistent
+  status chip, demolish hint, `?class` compressed arc, Trading Desk +
+  capital positions, scripted market events, blueprint copy/paste.
 
 ## 13. Non-goals (scope guard — v1)
-No fluids/derivatives, no logistics bots, no circuit network, no blueprints,
-no multiplayer, no mobile. Anything from this list only after M7 is green.
+No fluids/derivatives, no logistics bots, no circuit network, no multiplayer,
+no mobile. Anything from this list only after M7 is green.
 
 ---
 
