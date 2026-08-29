@@ -9,7 +9,7 @@ built and deployed by GitHub Actions on every push. No install, no server.
 
 Status: **the IPO route is closed in simulation; browser verification (M7) is
 still open.** TypeScript strict + Vite + Vitest; the gate `npm run check` is
-green (**131 tests**, 17 files). The scripted 50-sim-minute arc in
+green (**142 tests**, 18 files). The scripted 50-sim-minute arc in
 `src/sim/reachability.test.ts` — build, defend, expand, hire, no injected
 capital — reports `state=won` at 19.9 minutes. That is a harness result, not a
 playtest: no human hand has reached the win overlay in a browser, and nothing

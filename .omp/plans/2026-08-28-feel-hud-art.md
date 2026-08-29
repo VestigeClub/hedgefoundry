@@ -1,6 +1,6 @@
 # Feel / world-art / HUD overhaul (2026-08-28)
 
-Status: phase A (feel) committed 7e30cba · phase B (world art) in this commit · next: phase C (HUD rebuild)
+Status: A feel 7e30cba · B world art 6f12508 · C HUD 0183b13 · remaining: gate re-verify, push question, punch-list mode
 
 Brief (Zain, 2026-08-28): "nothing looks or feels different." Selected ALL:
 game feel, HUD rebuild, world art, then punch-list mode. Impeccable route:
