@@ -20,6 +20,7 @@ import { Panel } from "./ui/panel";
 import { BuildController } from "./ui/build";
 import { ResearchPanel } from "./ui/research";
 import { HelpOverlay } from "./ui/help";
+import { Minimap } from "./ui/minimap";
 import { Sound } from "./ui/sound";
 import { renderReport } from "./ui/report";
 import { Demo, demoSpeed } from "./demo/autoplay";
@@ -244,6 +245,7 @@ const build = new BuildController(
 );
 const research = new ResearchPanel(document.querySelector<HTMLElement>("#research")!, world);
 const help = new HelpOverlay(document.querySelector<HTMLElement>("#help")!);
+const minimap = new Minimap(document.querySelector<HTMLElement>("#minimap")!, world, camera);
 
 // Onboarding tutorial (DESIGN.md §8a): fresh world only, never ?demo. An
 // old save with no tutorial field means an established player — done.
@@ -425,6 +427,7 @@ function renderFrame(_alpha: number): void {
   fx.draw(ctx, camera);
 
   hud.update(world);
+  minimap.update(nowMs);
   panel.update();
   // A selected entity killed by a bro used to leave the inspector open on a
   // ghost forever (audit C3).

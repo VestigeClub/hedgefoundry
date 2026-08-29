@@ -379,6 +379,25 @@ body {
   z-index: 10;
 }
 
+/* Minimap (audit B5): top-left terrain overview, click-to-jump. Sits under
+  the ticker tape and clear of the research panel (left 260). */
+#minimap {
+  position: fixed;
+  top: 42px;
+  left: 12px;
+  z-index: 10;
+  border: 1px solid var(--grid);
+  border-radius: 4px;
+  background: rgba(10, 14, 20, 0.9);
+}
+
+#minimap canvas {
+  display: block;
+  width: 96px;
+  height: 96px;
+  cursor: crosshair;
+}
+
 .build-btn {
   display: flex;
   flex-direction: column;
