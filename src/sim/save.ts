@@ -46,6 +46,8 @@ interface SaveFormat {
     capHistory: World["capHistory"];
   };
   entities: SerializedEntity[];
+  /** Tutorial progress; absent in saves written before it → undefined. */
+  tutorial?: { step: number; done: boolean };
 }
 
 interface SerializedEntity {
@@ -134,7 +136,7 @@ function deserializeEntity(s: SerializedEntity): Entity {
   return e;
 }
 
-export function serializeWorld(w: World, mapOpts: MapGenOpts): string {
+export function serializeWorld(w: World, mapOpts: MapGenOpts, tutorial?: { step: number; done: boolean }): string {
   const save: SaveFormat = {
     v: 2,
     map: { ...mapOpts },
@@ -166,6 +168,7 @@ export function serializeWorld(w: World, mapOpts: MapGenOpts): string {
       capHistory: w.capHistory.map((p) => ({ ...p })),
     },
     entities: [...w.entities.values()].map(serializeEntity),
+    ...(tutorial ? { tutorial: { ...tutorial } } : {}),
   };
   return JSON.stringify(save);
 }
@@ -178,7 +181,7 @@ function parseSave(json: string): SaveFormat {
 }
 
 /** Rebuild a world from a serialized save; throws on corrupt/incompatible data. */
-export function deserializeWorld(json: string): { world: World; map: TileMap; feeds: FeedPatch[] } {
+export function deserializeWorld(json: string): { world: World; map: TileMap; feeds: FeedPatch[]; tutorial?: { step: number; done: boolean } } {
   const save = parseSave(json);
   const { map, feeds } = generateMap(save.map);
   const w = new World({ map, feeds, seed: save.map.seed, rng: new Rng(save.map.seed, save.world.rngState) });
@@ -210,7 +213,7 @@ export function deserializeWorld(json: string): { world: World; map: TileMap; fe
     const e = deserializeEntity(s);
     w.entities.set(e.id, e);
   }
-  return { world: w, map, feeds };
+  return { world: w, map, feeds, tutorial: save.tutorial ? { ...save.tutorial } : undefined };
 }
 
 /** localStorage-backed autosave helpers (browser only). */

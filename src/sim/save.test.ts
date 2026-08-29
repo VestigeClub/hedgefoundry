@@ -186,4 +186,16 @@ describe("save/load", () => {
     const idleDesk = [...idle.entities.values()].find((e) => e.kind === "funding")!;
     expect(idleDesk.funding!.selling).toBeNull();
   });
+  it("round-trips tutorial progress", () => {
+    const w = buildWorld();
+    const json = serializeWorld(w, MAP_OPTS, { step: 3, done: false });
+    const out = deserializeWorld(json);
+    expect(out.tutorial).toEqual({ step: 3, done: false });
+  });
+
+  it("serializes without tutorial when absent (old-save shape)", () => {
+    const w = buildWorld();
+    const out = deserializeWorld(serializeWorld(w, MAP_OPTS));
+    expect(out.tutorial).toBeUndefined();
+  });
 });
