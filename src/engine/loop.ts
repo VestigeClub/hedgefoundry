@@ -13,6 +13,7 @@ export class Loop {
   /** Sim speed multiplier: 1×, 2×, 4×. */
   speed = 1;
 
+
   private readonly fixedMs: number;
   private raf = 0;
   private last = 0;
@@ -49,4 +50,9 @@ export class Loop {
     this.sink.render(this.acc / this.fixedMs);
     this.raf = requestAnimationFrame(this.frame);
   };
+}
+
+/** Chrome label for the speed chip (DESIGN.md §8): paused or the multiplier. */
+export function speedChipLabel(paused: boolean, speed: number): string {
+  return paused ? "PAUSED" : `${speed}×`;
 }
