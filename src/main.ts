@@ -20,6 +20,7 @@ import { Panel } from "./ui/panel";
 import { BuildController } from "./ui/build";
 import { ResearchPanel } from "./ui/research";
 import { HelpOverlay } from "./ui/help";
+import { StatsPanel } from "./ui/stats";
 import { Minimap } from "./ui/minimap";
 import { Sound } from "./ui/sound";
 import { renderReport } from "./ui/report";
@@ -246,6 +247,7 @@ const build = new BuildController(
 const research = new ResearchPanel(document.querySelector<HTMLElement>("#research")!, world);
 const help = new HelpOverlay(document.querySelector<HTMLElement>("#help")!);
 const minimap = new Minimap(document.querySelector<HTMLElement>("#minimap")!, world, camera);
+const statsPanel = new StatsPanel(document.querySelector<HTMLElement>("#stats")!, world);
 
 // Onboarding tutorial (DESIGN.md §8a): fresh world only, never ?demo. An
 // old save with no tutorial field means an established player — done.
@@ -285,6 +287,7 @@ let prevT = false;
 let prevX = false;
 let prevSpace = false;
 let prevMinus = false;
+let prevStats = false;
 let prevEqual = false;
 let prevHelp = false;
 
@@ -372,6 +375,7 @@ function renderFrame(_alpha: number): void {
   if (tDown && !prevT) research.toggle();
   prevT = tDown;
   research.update();
+  statsPanel.update();
   // Pause + speed (audit B1): the Loop has supported this since M1, nothing
   // was wired. Edge-triggered like T so a held key flips exactly once.
   const spaceDown = input.keys.has("Space");
@@ -386,6 +390,10 @@ function renderFrame(_alpha: number): void {
   const hDown = input.keys.has("KeyH");
   if (hDown && !prevHelp) help.toggle();
   prevHelp = hDown;
+  // Stats panel (I): S is camera-pan-down, so the read-only panel rides I.
+  const iDown = input.keys.has("KeyI");
+  if (iDown && !prevStats) statsPanel.toggle();
+  prevStats = iDown;
 
   if (demo) {
     demo.update(frameMs);

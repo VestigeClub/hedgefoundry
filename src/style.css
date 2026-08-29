@@ -515,6 +515,66 @@ body {
   font-size: 10px;
 }
 
+/* Live stats panel (key I — S is camera-pan-down) */
+#stats {
+  position: fixed;
+  top: 62px;
+  right: 240px;
+  width: 280px;
+  max-height: calc(100vh - 260px);
+  overflow-y: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--grid);
+  border-radius: 4px;
+  background: rgba(15, 22, 32, 0.95);
+  color: var(--text);
+  font-size: 12px;
+  display: none;
+  z-index: 12;
+}
+
+#stats.open {
+  display: block;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 3px 12px;
+  margin-bottom: 8px;
+}
+
+.stat-k {
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.stat-v {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-v.up {
+  color: var(--up);
+}
+
+.stat-v.down {
+  color: var(--down);
+}
+
+.stat-sub {
+  color: var(--dim);
+  font-size: 10px;
+}
+
+.stat-curve {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--grid);
+  border-radius: 3px;
+}
+
 /* Research panel */
 #research {
   position: fixed;

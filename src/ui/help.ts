@@ -14,8 +14,7 @@ export class HelpOverlay {
           <dt>1–9, 0, Q, E, G</dt><dd>build menu</dd>
           <dt>R</dt><dd>rotate belt / trader</dd>
           <dt>X</dt><dd>demolish selected (50% refund)</dd>
-          <dt>T</dt><dd>research panel</dd>
-          <dt>S</dt><dd>stats panel</dd>
+          <dt>I</dt><dd>stats panel</dd>
           <dt>SPACE</dt><dd>pause</dd>
           <dt>- / =</dt><dd>slower / faster</dd>
           <dt>B</dt><dd>blueprint copy / paste</dd>

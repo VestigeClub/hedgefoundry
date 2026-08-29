@@ -323,7 +323,7 @@ client uses its fixed sim seed values — no server needed anywhere.
   - Right: selected-entity panel (recipe, buffers, grid status).
   - Minimap (top-left, 96px, click-to-jump).
   - Speed chip (`PAUSED`/`1×`/`2×`/`4×`, keys Space/`-`/`=`); help overlay
-    (H); stats panel (S).
+    (H); stats panel (I — S is camera-pan-down).
   - `LIVE`/`SIM` chip top-right; `v0.x` build chip.
 - Zoom 0.5–3, pan with WASD/edge/middle-drag, tile highlight hover.
 
@@ -480,7 +480,7 @@ payback rows are measured by `src/sim/reachability.test.ts`, not estimated.
 - **Cross-platform**: any browser opens `http://<host>:7891` (relay serves
   `dist/`); zero install. macOS browser check pending.
 - **2026-08-29 gap-closure pass** (chrome + depth, per §5.10/§5.11):
-  pause/speed keys, minimap click-to-jump, stats panel (S), persistent
+  pause/speed keys, minimap click-to-jump, stats panel (I), persistent
   status chip, demolish hint, `?class` compressed arc, Trading Desk +
   capital positions, scripted market events, blueprint copy/paste.
 
