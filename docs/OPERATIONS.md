@@ -136,7 +136,7 @@ row counts, world state — over pixels; snapshot the accessibility tree before 
 open one named tab and reuse it. If no browser device is available, **say the claim is
 unproven** and hand the URL to the user. An HTTP 200 is not proof the game runs.
 
-## 8. Context ceiling and the browser device (two harness incidents, 2026-08-27)
+## 8. Context ceiling and the browser device (two harness incidents)
 
 1. **Context window arithmetic is a law, not a guess.** One model lane rejected requests
    outright: prompt size plus the configured completion size crossed the model's context
@@ -159,6 +159,6 @@ unproven** and hand the URL to the user. An HTTP 200 is not proof the game runs.
 - Never run destructive git (`git reset --hard`, `git clean -f`) — the harness denies it
   for a reason. Repair forward, or ask.
 - Fleet/serving work (model pulls, lane config) does not run from this cwd. It belongs in
-  the fleet workspace; running it here mixed 41 M tokens of unrelated state into this
-  history and memory.
+  the fleet workspace — running it from a game repo mixed unrelated state into this
+  project's history and memory.
 - Never claim a fix without a check that would have failed before it.
