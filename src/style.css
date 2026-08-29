@@ -771,8 +771,7 @@ button:focus-visible {
 /* Onboarding tutorial coach card (DESIGN.md §8a) */
 #tutorial {
   position: fixed;
-  left: 16px;
-  bottom: 56px;
+  bottom: 96px;
   width: 380px;
   z-index: 20;
   pointer-events: none;
