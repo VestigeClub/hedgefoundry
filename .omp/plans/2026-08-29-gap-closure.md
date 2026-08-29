@@ -38,4 +38,6 @@ ALL TASKS SHIPPED. Last green `npm run check` at HEAD (typecheck + 173 tests
 
 ## Next action
 
-Live pass complete (browser, `?debug` + `?class`). Owner review, then push.
+Live pass complete (browser, `?debug` + `?class`) and post-audit fix shipped
+in e3bff88 (speed keys inert after game over, Escape exits blueprint —
+live-verified on `?demo`/`?debug`, full gate green). Pushed to origin.
