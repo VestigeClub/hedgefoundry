@@ -11,7 +11,7 @@ import { drawEntities } from "./engine/entity-render";
 import { Fx } from "./engine/fx";
 import { FeedClient, fetchWorldSeed, relayBase } from "./market/feed";
 import { generateMap } from "./world/mapgen";
-import { HIRE_QUOTA, World, type FxCue } from "./sim/world";
+import { COSTS, HIRE_QUOTA, World, type FxCue } from "./sim/world";
 import { tickWorld } from "./sim/update";
 import { serializeWorld, deserializeWorld, saveToStorage, loadFromStorage, clearStorageSave } from "./sim/save";
 import { Ticker } from "./ui/ticker";
@@ -20,6 +20,7 @@ import { Panel } from "./ui/panel";
 import { BuildController } from "./ui/build";
 import { ResearchPanel } from "./ui/research";
 import { HelpOverlay } from "./ui/help";
+import { BlueprintController } from "./ui/blueprint";
 import { StatsPanel } from "./ui/stats";
 import { Minimap } from "./ui/minimap";
 import { Sound } from "./ui/sound";
@@ -249,6 +250,7 @@ const build = new BuildController(
   },
   document.querySelector<HTMLElement>("#buildbar")!,
 );
+const blueprint = new BlueprintController(world, camera, input, (kind) => COSTS[kind], toast);
 const research = new ResearchPanel(document.querySelector<HTMLElement>("#research")!, world);
 const help = new HelpOverlay(document.querySelector<HTMLElement>("#help")!);
 const minimap = new Minimap(document.querySelector<HTMLElement>("#minimap")!, world, camera);
@@ -288,6 +290,7 @@ const PAN_SPEED = 700; // CSS px/s at zoom 1
 let lastSaveMs = 0;
 let lastVoided = 0;
 let lastWasteAt = -Infinity;
+let prevBlueprint = false;
 let lastFrameMs = performance.now();
 let prevT = false;
 let prevX = false;
@@ -401,6 +404,11 @@ function renderFrame(_alpha: number): void {
   const iDown = input.keys.has("KeyI");
   if (iDown && !prevStats) statsPanel.toggle();
   prevStats = iDown;
+  // Blueprint (B): cycles copy → paste → off; mouse handling inside.
+  const bDown = input.keys.has("KeyB");
+  if (bDown && !prevBlueprint) blueprint.cycle();
+  prevBlueprint = bDown;
+  blueprint.update();
 
   if (demo) {
     demo.update(frameMs);
@@ -439,6 +447,7 @@ function renderFrame(_alpha: number): void {
   if (tutorialTarget) drawHighlight(ctx, camera, tutorialTarget, world.timeMs);
   ctx.restore();
   build.drawGhost(ctx);
+  blueprint.drawGhost(ctx);
   fx.draw(ctx, camera);
 
   hud.update(world);
