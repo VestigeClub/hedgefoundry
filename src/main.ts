@@ -361,7 +361,7 @@ function renderFrame(_alpha: number): void {
   fx.update(frameMs);
   ctx.save();
   ctx.translate(fx.shakeX, fx.shakeY);
-  drawMap(ctx, world.map, camera);
+  drawMap(ctx, world.map, camera, world.timeMs);
   drawImpact(ctx, world, camera);
   drawEntities(ctx, world, camera, world.timeMs);
   ctx.restore();

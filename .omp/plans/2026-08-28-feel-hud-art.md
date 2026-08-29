@@ -1,6 +1,6 @@
 # Feel / world-art / HUD overhaul (2026-08-28)
 
-Status: IMPLEMENTING — phase A (feel) in progress · last commit: 50aeda2 · next: engine/fx.ts
+Status: phase A (feel) committed 7e30cba · phase B (world art) in this commit · next: phase C (HUD rebuild)
 
 Brief (Zain, 2026-08-28): "nothing looks or feels different." Selected ALL:
 game feel, HUD rebuild, world art, then punch-list mode. Impeccable route:
