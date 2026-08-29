@@ -515,6 +515,27 @@ body {
   font-size: 10px;
 }
 
+/* Dev perf HUD (F9): fps / tick ms / entity count, 2 Hz patch */
+#perf {
+  position: fixed;
+  bottom: 8px;
+  left: 8px;
+  z-index: 30;
+  display: none;
+  padding: 3px 8px;
+  border: 1px solid var(--grid);
+  border-radius: 3px;
+  background: rgba(10, 14, 20, 0.85);
+  color: var(--dim);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+#perf.show {
+  display: block;
+}
+
 /* Live stats panel (key I — S is camera-pan-down) */
 #stats {
   position: fixed;

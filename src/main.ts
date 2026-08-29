@@ -253,6 +253,13 @@ const build = new BuildController(
 const blueprint = new BlueprintController(world, camera, input, (kind) => COSTS[kind], toast);
 const research = new ResearchPanel(document.querySelector<HTMLElement>("#research")!, world);
 const help = new HelpOverlay(document.querySelector<HTMLElement>("#help")!);
+const perfEl = document.querySelector<HTMLElement>("#perf")!;
+let showPerf = import.meta.env.DEV || params.has("debug");
+perfEl.classList.toggle("show", showPerf);
+let frameMsEma = 16.7;
+let tickMsEma = 0;
+let lastPerfPatch = 0;
+let prevF9 = false;
 const minimap = new Minimap(document.querySelector<HTMLElement>("#minimap")!, world, camera);
 const statsPanel = new StatsPanel(document.querySelector<HTMLElement>("#stats")!, world);
 
@@ -310,6 +317,7 @@ function sizeCanvas(): void {
 
 const loop = new Loop({
   tick: (dtMs) => {
+    const t0 = performance.now();
     try {
       feed.advanceSim(dtMs); // no-op while the relay is live
       tickWorld(world, dtMs * (demo ? demoSpeed() : 1));
@@ -334,6 +342,9 @@ const loop = new Loop({
       }
     } catch (err) {
       fatal("tick", err);
+    } finally {
+      const dt = performance.now() - t0;
+      tickMsEma = tickMsEma === 0 ? dt : tickMsEma * 0.9 + dt * 0.1;
     }
   },
   render: (dt) => {
@@ -418,6 +429,18 @@ function renderFrame(_alpha: number): void {
   // been unit-tested since M1 and was never wired up — audit D1).
   camera.clampTo(MAP_W * TILE_SIZE, MAP_H * TILE_SIZE);
 
+  // Dev perf HUD (F9): fps / tick ms / entity count, patched at 2 Hz.
+  frameMsEma = frameMsEma * 0.9 + frameMs * 0.1;
+  const f9 = input.keys.has("F9");
+  if (f9 && !prevF9) {
+    showPerf = !showPerf;
+    perfEl.classList.toggle("show", showPerf);
+  }
+  prevF9 = f9;
+  if (showPerf && nowMs - lastPerfPatch >= 500) {
+    lastPerfPatch = nowMs;
+    perfEl.textContent = `FPS ${Math.round(1000 / frameMsEma)} · TICK ${tickMsEma.toFixed(2)}ms · ${world.entities.size} ENT`;
+  }
   // Tutorial: check triggers at its own throttle, patch the card, resolve the
   // ring target for this frame (DESIGN.md §8a).
   let tutorialTarget: TutorialRect | null = null;
