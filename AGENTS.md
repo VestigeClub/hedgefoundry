@@ -45,8 +45,8 @@ system; theme mapping §4 is law.
 3. **Commit at every green check.** Never leave the tree dirty at session end. The
    plan file carries `Status:` with the last commit hash and the next action.
 4. **The `bash` tool is POSIX bash**: bash syntax, forward slashes; PowerShell only
-   single-quoted. Any command handed to Zain is first verified against the installed
-   binary, with its shell named.
+   single-quoted. Any command handed to the human operator is first verified against
+   the installed binary, with its shell named.
 
 Full mechanics — verification ladder, subagent file ownership, context budget, visual
 verification, harness limits, boundaries: **`docs/OPERATIONS.md`**. It is binding.

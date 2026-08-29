@@ -1,12 +1,12 @@
 # HedgeFoundry — Repository Operations
 
-Status: v1.0 (2026-08-27) · Owner: Zain · Audience: every agent session in this repo.
+Status: v1.1 (2026-08-29) · Audience: every agent session in this repo.
 
 This is the file `AGENTS.md` §Repo layout promises: how work gets *executed* here —
 edit discipline, verification, shell rules, subagent ownership, session hygiene.
 `docs/DESIGN.md` is the contract for **what** to build; this is the contract for
 **how** to build it without wrecking it. Every rule below was earned from a measured
-failure; the evidence and numbers live in `.omp/reports/2026-08-27-ruckus-session-friction.md`
+failure; the evidence and numbers live in a local session-friction report
 (local scratch, not tracked).
 
 Re-measure friction any time: `python scripts/agent_audit.py summary|friction|errors|advisories|hygiene`.
@@ -138,7 +138,7 @@ unproven** and hand the URL to the user. An HTTP 200 is not proof the game runs.
 
 ## 8. Context ceiling (owner-directed, agent-applied)
 
-Observed 2026-08-27: ten HTTP 400s against the ruckus lane — *"262144 max context; you
+Observed 2026-08-27: ten HTTP 400s against the local model lane — *"262144 max context; you
 requested 64000 output and your prompt contains at least 198145 input tokens"* — of which
 five happened **after** the 21:00 UTC `config.yml` edit, each still asking for 64,000
 completion tokens. `198145 = 262144 − 64000 + 1`, so the margin is one token. The existing
@@ -180,12 +180,13 @@ browser:
   headless: true   # only reached if relay is off
 ```
 
-Because `browser.relay` precedes `browser.headless`, every `open` attaches to Zain's own
-Chrome through the loopback relay. The relay endpoint is up (`127.0.0.1:9224/json/version`
-answers 200, `Chrome/151.0.0.0`), but the sessions that did get the device recorded
-`ERR_ABORTED` on navigation — even a `data:` URL (`docs/BUILD_LOG.md:83-86`) — and in others
-the tool never mounted at all (`Tool xd__browser not found`). **Consequence: no UI claim in
-this repo is visually verified.** Treat the device as unavailable.
+Because `browser.relay` precedes `browser.headless`, every `open` attaches to the
+operator's own Chrome through the loopback relay. The relay endpoint is up (loopback
+`/json/version` answers 200), but the sessions that did get the device recorded
+`ERR_ABORTED` on navigation — even a `data:` URL — and in others the tool never
+mounted at all. The operator switched the device to isolated headless on 2026-08-28
+(`browser.relay: false`, `browser.headless: true`); that configuration is the one behind
+every browser check in `docs/PLAYTEST.md`.
 
 Owner options, one line each:
 
@@ -194,8 +195,8 @@ Owner options, one line each:
   `~/.cache/puppeteer/chrome/win64-151.0.7922.77` (verified present). Deterministic, no
   access to logged-in tabs.
 - **Keep the relay:** run `omp browser-relay install` once and check the extension badge.
-  Powerful, but agents then drive the real browser under his account — named local preview
-  tabs only.
+  Powerful, but agents then drive the real browser under the operator's account —
+  named local preview tabs only.
 
 Until one of those is in place and an `open about:blank` succeeds, agents must say
 **"unproven"** and hand over `npm run preview` instead of substituting an HTTP check.
@@ -207,6 +208,6 @@ Until one of those is in place and an `open about:blank` succeeds, agents must s
 - Never run destructive git (`git reset --hard`, `git clean -f`) — the harness denies it
   for a reason. Repair forward, or ask.
 - Fleet/serving work (model pulls, lane config) does not run from this cwd. It belongs in
-  `D:\Workspace`; running it here mixed 41 M tokens of unrelated state into this project's
+  the fleet workspace; running it here mixed 41 M tokens of unrelated state into this
   history and memory.
 - Never claim a fix without a check that would have failed before it.

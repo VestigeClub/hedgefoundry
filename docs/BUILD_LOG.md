@@ -129,3 +129,27 @@ Two other candidate findings were withdrawn after reading the source — demolis
 select-then-`X` and refunds exactly half, and per-frame input sampling makes
 sub-frame synthetic clicks legitimately invisible. Both were my probe, not the game;
 recording them is what keeps the next pass from "fixing" working code.
+
+## How the agent was used — three representative prompts
+
+The full record is the plan files in `.omp/plans/` and the commit log; the pattern it
+documents is: specify → let the agent build → verify on the running game → fix what the
+check catches → commit. Three prompts, representative of the ~73:
+
+1. *"Plan a full-fledged tutorial that is seamless and that anyone can understand."*
+   → design entry first (`docs/DESIGN.md` §8a), then the step engine, save field, and
+   coach card as three TDD'd commits (`8eace51`…`057530d`). Design-before-build is why
+   the tutorial ships with predicate tests instead of vibes.
+2. *"Run a full end-to-end audit of the live game; ranked defects, no fixes until I
+   pick scope."* → the audit (2026-08-28) verified live defects — pause/speed dead
+   code, tutorial bleed-through, undiscoverable demolish, no minimap — and waited; the
+   owner's GO then executed them as commits `59b1dd7`–`496420d`, each live-verified.
+3. *"GO on A, don't do anything upstream, fix it locally."* → the context-ceiling
+   repair in `docs/OPERATIONS.md` §8: one config line, backup verified by diff, and
+   the arithmetic written down so the next session can re-check it.
+
+Ownership: the human picks scope and GO's launches; agents implement, test, and
+produce screenshot evidence; every claim in the two logs traces to a commit, a test,
+or a screenshot — the withdrawn findings at the bottom of `docs/PLAYTEST.md` are that
+rule working in reverse (probes that looked like defects were checked against source
+and withdrawn rather than "fixed").
