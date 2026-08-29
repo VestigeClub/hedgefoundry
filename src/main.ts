@@ -22,6 +22,10 @@ import { ResearchPanel } from "./ui/research";
 import { Sound } from "./ui/sound";
 import { renderReport } from "./ui/report";
 import { Demo, demoSpeed } from "./demo/autoplay";
+import { Tutorial, type TutorialProgress } from "./tutorial/tutorial";
+import { TutorialCard } from "./tutorial/card";
+import { TUTORIAL_STEPS, type TutorialRect } from "./tutorial/steps";
+import { drawHighlight } from "./tutorial/highlight";
 import { TILE_SIZE, type TileMap } from "./world/tilemap";
 import type { FeedPatch } from "./world/mapgen";
 
@@ -52,21 +56,22 @@ const MAP_OPTS = { width: MAP_W, height: MAP_H, seed: WORLD_SEED, startClearRadi
 const camera = new Camera(innerWidth, innerHeight);
 const input = new Input(canvas);
 const gen = generateMap(MAP_OPTS);
+let world = new World({ map: gen.map, feeds: gen.feeds, seed: WORLD_SEED });
+let feeds: FeedPatch[] = gen.feeds;
 
 // M7: ?demo starts fresh, never resumes an autosave.
 const isDemo = new URLSearchParams(location.search).has("demo");
 if (isDemo) clearStorageSave();
 
-let world = new World({ map: gen.map, feeds: gen.feeds, seed: WORLD_SEED });
-let feeds: FeedPatch[] = gen.feeds;
-
 // M6: resume an autosave if present; discard corrupt data.
 const saved = loadFromStorage();
+let savedTutorial: TutorialProgress | undefined;
 if (saved) {
   try {
     const r = deserializeWorld(saved);
     world = r.world;
     feeds = r.feeds;
+    savedTutorial = r.tutorial;
     console.log("[save] resumed autosave");
   } catch (err) {
     console.warn("[save] discarding corrupt save", err);
@@ -238,6 +243,17 @@ const build = new BuildController(
 );
 const research = new ResearchPanel(document.querySelector<HTMLElement>("#research")!, world);
 
+// Onboarding tutorial (DESIGN.md §8a): fresh world only, never ?demo. An
+// old save with no tutorial field means an established player — done.
+const freshWorld = [...world.entities.values()].every((e) => e.kind === "hq");
+const tutorial = isDemo ? null : new Tutorial(savedTutorial ?? { step: 0, done: !freshWorld });
+const tutorialCard = tutorial
+  ? new TutorialCard(document.querySelector<HTMLElement>("#tutorial")!, () => tutorial.skip())
+  : null;
+// Any pan past the boot position completes step 0 (0.5 tiles, Manhattan).
+const tutorialHome = tutorial ? { x: camera.x, y: camera.y } : null;
+let tutorialPainted = -1;
+
 // M7: cinematic demo mode (?demo) — scripted autoplay at 4× sim speed.
 const demo = isDemo ? new Demo(world, camera) : null;
 
@@ -282,14 +298,14 @@ const loop = new Loop({
       // serializes a finished world every frame. Demo never writes: the
       // scripted run would overwrite the player's campaign save (audit C1).
       if (world.state === "playing" && !isDemo && world.timeMs - lastSaveMs >= 10_000) {
-        saveToStorage(serializeWorld(world, MAP_OPTS));
+        saveToStorage(serializeWorld(world, MAP_OPTS, tutorial?.progress()));
         lastSaveMs = world.timeMs;
       }
       // Ctrl+S saves now — the player's instinct, and the browser dialog it
       // used to open is a gameplay interruption (audit C4).
       if (input.consumeSaveRequest()) {
         if (world.state === "playing" && !isDemo) {
-          saveToStorage(serializeWorld(world, MAP_OPTS));
+          saveToStorage(serializeWorld(world, MAP_OPTS, tutorial?.progress()));
           lastSaveMs = world.timeMs;
           toast("SAVED");
         } else {
@@ -357,6 +373,25 @@ function renderFrame(_alpha: number): void {
   // been unit-tested since M1 and was never wired up — audit D1).
   camera.clampTo(MAP_W * TILE_SIZE, MAP_H * TILE_SIZE);
 
+  // Tutorial: check triggers at its own throttle, patch the card, resolve the
+  // ring target for this frame (DESIGN.md §8a).
+  let tutorialTarget: TutorialRect | null = null;
+  if (tutorial && tutorialCard) {
+    const moved = tutorialHome
+      ? Math.abs(camera.x - tutorialHome.x) + Math.abs(camera.y - tutorialHome.y) > 16
+      : false;
+    const snap = tutorial.update(world, frameMs, { cameraMoved: moved });
+    const step = TUTORIAL_STEPS[snap.step];
+    if (snap.done) {
+      tutorialCard.hide();
+    } else if (step && tutorialPainted !== snap.step) {
+      tutorialPainted = snap.step;
+      tutorialCard.setStep(step);
+    }
+    tutorialCard.setTrouble(snap.done ? null : snap.trouble);
+    if (!snap.done && step) tutorialTarget = step.highlight(world);
+  }
+
   drainCues();
   fx.update(frameMs);
   ctx.save();
@@ -364,6 +399,7 @@ function renderFrame(_alpha: number): void {
   drawMap(ctx, world.map, camera, world.timeMs);
   drawImpact(ctx, world, camera);
   drawEntities(ctx, world, camera, world.timeMs);
+  if (tutorialTarget) drawHighlight(ctx, camera, tutorialTarget, world.timeMs);
   ctx.restore();
   build.drawGhost(ctx);
   fx.draw(ctx, camera);
@@ -483,7 +519,7 @@ document.querySelector<HTMLElement>("#overlay-btn")!.addEventListener("click", (
   location.href = location.pathname;
 });
 addEventListener("beforeunload", () => {
-  if (world.state === "playing" && !isDemo) saveToStorage(serializeWorld(world, MAP_OPTS));
+  if (world.state === "playing" && !isDemo) saveToStorage(serializeWorld(world, MAP_OPTS, tutorial?.progress()));
 });
 // The playtest harness (docs/OPERATIONS.md) drives the game through this
 // handle, so it exists in a dev build or when the page is opened with ?debug.

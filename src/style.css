@@ -767,3 +767,68 @@ button:focus-visible {
     transition: none !important;
   }
 }
+
+/* Onboarding tutorial coach card (DESIGN.md §8a) */
+#tutorial {
+  position: fixed;
+  left: 16px;
+  bottom: 56px;
+  width: 380px;
+  z-index: 20;
+  pointer-events: none;
+}
+
+.tut-card {
+  background: rgba(15, 22, 32, 0.94);
+  border: 1px solid var(--cyan);
+  padding: 12px 14px;
+  pointer-events: auto;
+}
+
+.tut-title {
+  color: var(--cyan);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+
+.tut-trouble {
+  color: var(--amber);
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.tut-body {
+  font-size: 12px;
+  line-height: 1.5;
+  margin-bottom: 8px;
+}
+
+.tut-chips {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.tut-chip {
+  border: 1px solid var(--grid);
+  color: var(--up);
+  font-size: 10px;
+  padding: 2px 8px;
+}
+
+.tut-skip {
+  background: none;
+  border: 1px solid var(--grid);
+  color: var(--dim);
+  font-size: 10px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.tut-skip:hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
+}
