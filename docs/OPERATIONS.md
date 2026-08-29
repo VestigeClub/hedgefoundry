@@ -136,70 +136,21 @@ row counts, world state — over pixels; snapshot the accessibility tree before 
 open one named tab and reuse it. If no browser device is available, **say the claim is
 unproven** and hand the URL to the user. An HTTP 200 is not proof the game runs.
 
-## 8. Context ceiling (owner-directed, agent-applied)
+## 8. Context ceiling and the browser device (two harness incidents, 2026-08-27)
 
-Observed 2026-08-27: ten HTTP 400s against the local model lane — *"262144 max context; you
-requested 64000 output and your prompt contains at least 198145 input tokens"* — of which
-five happened **after** the 21:00 UTC `config.yml` edit, each still asking for 64,000
-completion tokens. `198145 = 262144 − 64000 + 1`, so the margin is one token. The existing
-`compaction.thresholdPercent: 70` is necessary but not sufficient: compaction is a guess,
-the arithmetic is a law.
-
-Applied 2026-08-27 23:05 UTC on the owner's instruction ("GO on A, don't do anything upstream,
-fix it locally"): `compaction.thresholdPercent: 70 → 60`, one line at
-`~/.omp/agent/config.yml:14`, backup `config.yml.bak-20260827-ctx-ceiling` (verified by
-`diff`: `14c14` and nothing else). At 60 % the estimate caps at 157.3k, so
-157.3k + 64k = 221.3k — ~41k under the 262,144 window, and ~26k of clearance above the
-measured +15k tokenizer drift.
-
-Three honest limits on this:
-- A turn's tool output is appended *after* the threshold check, so one oversized dump can
-  still cross the 198,144 floor. §1 and §6 (stop re-reading the same file 118 times, keep
-  files short) are the fix for that, not a smaller number.
-- `maxTokens: 65536` in `models.yml:12,40,63` is deliberately untouched. Halving it buys 32k
-  of headroom but truncates the wholesale rewrites §1 requires (`update.ts` is 615 lines),
-  trading a loud failure for a silent one. Splitting those files is what makes a lower output
-  cap affordable.
-- Config binds at session start. The session that produced the 400s (started 16:58 UTC) still
-  holds 70 % in memory until it is restarted.
-
-Not done, deliberately: the durable fix belongs to the harness — bound the completion per
-request (`max_completion_tokens = min(default, ctx − promptTokens − margin)`) and refuse to
-send above the threshold rather than trusting compaction to shrink in time. The owner scoped
-this to local config, so it is recorded here rather than filed upstream.
-
-Lowering the prompt stays the real lever regardless: §6 keeps a session away from the ceiling,
-and §2 keeps sessions short enough never to approach it.
-
-**Browser device — the real state (verified 2026-08-27).** The device is configured in
-`~/.omp/agent/config.yml`, not a `settings.yml` (no such file exists):
-
-```yaml
-browser:
-  relay: true      # checked FIRST when a call carries no `app`
-  headless: true   # only reached if relay is off
-```
-
-Because `browser.relay` precedes `browser.headless`, every `open` attaches to the
-operator's own Chrome through the loopback relay. The relay endpoint is up (loopback
-`/json/version` answers 200), but the sessions that did get the device recorded
-`ERR_ABORTED` on navigation — even a `data:` URL — and in others the tool never
-mounted at all. The operator switched the device to isolated headless on 2026-08-28
-(`browser.relay: false`, `browser.headless: true`); that configuration is the one behind
-every browser check in `docs/PLAYTEST.md`.
-
-Owner options, one line each:
-
-- **Isolated (recommended for this project):** `browser.relay: false` → resolution falls
-  through to `browser.headless: true`, using the Chromium already on disk at
-  `~/.cache/puppeteer/chrome/win64-151.0.7922.77` (verified present). Deterministic, no
-  access to logged-in tabs.
-- **Keep the relay:** run `omp browser-relay install` once and check the extension badge.
-  Powerful, but agents then drive the real browser under the operator's account —
-  named local preview tabs only.
-
-Until one of those is in place and an `open about:blank` succeeds, agents must say
-**"unproven"** and hand over `npm run preview` instead of substituting an HTTP check.
+1. **Context window arithmetic is a law, not a guess.** One model lane rejected requests
+   outright: prompt size plus the configured completion size crossed the model's context
+   window with a margin of one token, and compaction never shrank in time. The local fix,
+   on the owner's instruction ("GO on A, don't do anything upstream, fix it locally"): lower
+   the compaction threshold, and record the durable fix as upstream-shaped — bound the
+   completion per request instead of trusting compaction to shrink in time. The real lever
+   is lowering the prompt: §6 keeps a session away from the ceiling, and §2 keeps sessions
+   short enough never to approach it.
+2. **The browser device is identity, not plumbing.** A relay configured ahead of the
+   headless fallback silently attached agents to the operator's own logged-in browser, and
+   navigation from the relayed sessions kept failing. The operator switched the device to
+   isolated headless on 2026-08-28; that configuration is the one behind every browser check
+   in `docs/PLAYTEST.md`.
 
 ## 9. Boundaries
 

@@ -145,8 +145,9 @@ check catches → commit. Three prompts, representative of the ~73:
    code, tutorial bleed-through, undiscoverable demolish, no minimap — and waited; the
    owner's GO then executed them as commits `59b1dd7`–`496420d`, each live-verified.
 3. *"GO on A, don't do anything upstream, fix it locally."* → the context-ceiling
-   repair in `docs/OPERATIONS.md` §8: one config line, backup verified by diff, and
-   the arithmetic written down so the next session can re-check it.
+   repair recorded in `docs/OPERATIONS.md` §8 as a transferable lesson — bound the
+   completion per request rather than trusting compaction — with identifying details
+   stripped before the repo went public.
 
 Ownership: the human picks scope and GO's launches; agents implement, test, and
 produce screenshot evidence; every claim in the two logs traces to a commit, a test,
