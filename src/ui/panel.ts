@@ -75,7 +75,7 @@ export class Panel {
       // NO POWER on a working belt is a lie.
       if (e.kind !== "belt" && e.kind !== "trader" && e.kind !== "link") {
         const powered = w.powered.has(e.id);
-        parts.push(`<div class="p-row">GRID: <span class="${powered ? "up" : "down"}">${powered ? "POWERED" : "NO POWER"}</span></div>`);
+        parts.push(`<div class="p-row">GRID: <span class="pill ${powered ? "up" : "down"}">${powered ? "POWERED" : "NO POWER"}</span></div>`);
       }
 
       if (e.machine) {
@@ -86,7 +86,7 @@ export class Panel {
         const outs = Object.entries(c.recipe.out).map(([it, q]) => `${ITEM_LABEL[it as Item]} ${scale(it as Item, q!)}`).join(" + ");
         parts.push(`<div class="p-row">IN: ${ins}</div>`);
         parts.push(`<div class="p-row">OUT: ${outs || "—"}</div>`);
-        parts.push(`<div class="p-row">STATUS: <span class="${c.blocked ? "down" : ""}">${machineStatus(c, w)}</span></div>`);
+        parts.push(`<div class="p-row">STATUS: <span class="pill ${c.blocked ? "down" : c.crafting ? "up" : "warn"}">${machineStatus(c, w)}</span></div>`);
         parts.push(`<div class="p-row">INPUT: ${bufferSummary(c.input)}</div>`);
         parts.push(`<div class="p-row">OUTPUT: ${bufferSummary(c.output)}</div>`);
       }
@@ -99,7 +99,7 @@ export class Panel {
         const held = options.find((o) => (e.funding!.input.items[o.fuel] ?? 0) > 0);
         parts.push(`<div class="p-row">SELLS: ${options.map((o) => o.label).join(" · ")}</div>`);
         parts.push(
-          `<div class="p-row">STATUS: <span class="${held ? "" : "down"}">${
+          `<div class="p-row">STATUS: <span class="pill ${held ? "up" : "warn"}">${
             held ? `SELLING ${held.label} → $${fmt(held.capPerSec)}/s` : "IDLE · NEEDS FUEL"
           }</span></div>`,
         );

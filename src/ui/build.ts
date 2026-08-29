@@ -1,5 +1,6 @@
 import type { Camera } from "../engine/camera";
 import type { Input } from "../engine/input";
+import { KIND_COLOR, KIND_GLYPH } from "../engine/entity-render";
 import { TILE_SIZE } from "../world/tilemap";
 import { COSTS, DIRS, SIZES, type Dir, type Entity, type EntityKind, type World } from "../sim/world";
 
@@ -60,6 +61,8 @@ export class BuildController {
   /** Keys held last frame — build keys are edge-triggered (a held key must not
    * toggle the tool once per frame). */
   private readonly prevKeys = new Set<string>();
+  /** Affordability bitmask last painted onto the bar (dim unaffordable). */
+  private afford = -1;
 
   constructor(
     private readonly world: World,
@@ -71,7 +74,9 @@ export class BuildController {
     for (const b of BUILD_ORDER) {
       const btn = document.createElement("button");
       btn.className = "build-btn";
-      btn.innerHTML = `<span class="key">${b.key.toUpperCase()}</span><span class="lbl">${b.label}</span><span class="cost">$${fmtCost(COSTS[b.kind])}</span>`;
+      const ico = KIND_GLYPH[b.kind] || (b.kind === "belt" ? "══" : b.kind === "link" ? "LK" : "·");
+      btn.style.setProperty("--k", KIND_COLOR[b.kind] ?? "var(--cyan)");
+      btn.innerHTML = `<span class="key">${b.key.toUpperCase()}</span><span class="ico">${ico}</span><span class="lbl">${b.label}</span><span class="cost">$${fmtCost(COSTS[b.kind])}</span>`;
       btn.addEventListener("click", () => {
         this.setTool(b.kind);
         // Drop focus so number hotkeys keep working after a toolbar click.
@@ -98,6 +103,15 @@ export class BuildController {
       this.syncBar();
     }
     if (right && !this.prevRight) this.setTool(null);
+
+    let afford = 0;
+    for (let i = 0; i < BUILD_ORDER.length; i++)
+      if (this.world.capital >= COSTS[BUILD_ORDER[i]!.kind]) afford |= 1 << i;
+    if (afford !== this.afford) {
+      this.afford = afford;
+      for (let i = 0; i < BUILD_ORDER.length; i++)
+        this.bar.children[i]?.classList.toggle("cant", (afford >> i & 1) === 0);
+    }
 
     if (left && !this.prevLeft) {
       const { tx, ty } = this.hoverTile();

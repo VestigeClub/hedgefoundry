@@ -10,7 +10,7 @@ import { ITEM_COLOR } from "../sim/items";
 import { DIRS, DX, DY, type Entity, type World } from "../sim/world";
 import { PALETTE } from "./renderer";
 
-const KIND_COLOR: Record<string, string> = {
+export const KIND_COLOR: Record<string, string> = {
   miner: "#22d3ee",
   cleaner: "#34d399",
   analytics: "#a78bfa",
@@ -23,12 +23,11 @@ const KIND_COLOR: Record<string, string> = {
   belt: "#16222f",
   trader: "#e2e8f0",
   tower: "#fb7185",
-  hq: "#38bdf8",
   roadshow: "#fbbf24",
   bro: "#f472b6",
 };
 
-const KIND_GLYPH: Record<string, string> = {
+export const KIND_GLYPH: Record<string, string> = {
   miner: "M",
   cleaner: "CL",
   analytics: "AN",

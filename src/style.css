@@ -164,29 +164,161 @@ body {
   display: block;
 }
 
-/* HUD stats strip (top-right, below chips) */
+/* HUD stat cards (top-right, below chips) — the trading desk */
 #hud {
   position: fixed;
   top: 62px;
   right: 8px;
-  max-width: 520px;
-  padding: 4px 8px;
+  width: 224px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  z-index: 10;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-card {
+  padding: 7px 9px;
+  border: 1px solid var(--grid);
+  border-radius: 4px;
+  background: rgba(10, 14, 20, 0.88);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.hud-card.wide {
+  grid-column: 1 / -1;
+}
+
+.hud-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.hud-label {
+  color: var(--dim);
+  font-size: 9px;
+  letter-spacing: 0.14em;
+}
+
+.hud-big {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.hud-sub {
+  color: var(--dim);
+  font-size: 10px;
+}
+
+.hud-net {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+
+.hud-net.up {
+  color: var(--up);
+}
+
+.hud-net.down {
+  color: var(--down);
+}
+
+.hud-meter {
+  margin-top: 5px;
+  height: 3px;
+  border-radius: 2px;
+  background: #1c2c3d;
+  overflow: hidden;
+}
+
+.hud-fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  background: var(--cyan);
+  transition: width 0.2s linear;
+}
+
+.hud-fill.heat {
+  background: var(--up);
+}
+
+.hud-fill.heat.mid {
+  background: var(--amber);
+}
+
+.hud-fill.heat.hot {
+  background: var(--down);
+}
+
+.hud-chips {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid var(--grid);
+  border-radius: 4px;
+  background: rgba(10, 14, 20, 0.88);
+}
+
+.hud-chip {
+  padding: 1px 5px;
   border: 1px solid var(--grid);
   border-radius: 3px;
-  background: rgba(10, 14, 20, 0.85);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+}
+
+.hud-chip.on {
   color: var(--text);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-align: right;
-  pointer-events: none;
-  z-index: 10;
+  border-color: #2a4056;
+  background: rgba(0, 200, 255, 0.07);
+}
+
+.hud-wave {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid var(--grid);
+  border-radius: 4px;
+  background: rgba(10, 14, 20, 0.88);
+}
+
+.hud-wave.warn {
+  border-color: var(--down);
+}
+
+.hud-wave.warn .hud-label {
+  color: var(--down);
+}
+
+.hud-wave .hud-big {
+  font-size: 13px;
+}
+
+.hud-dial {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--grid);
+  background: conic-gradient(var(--cyan) 0%, #1c2c3d 0%);
 }
 
 /* Entity inspector */
 #panel {
   position: fixed;
-  top: 100px;
-  right: 8px;
+  top: 62px;
+  left: 8px;
   width: 240px;
   padding: 10px 12px;
   border: 1px solid var(--grid);
@@ -309,8 +441,8 @@ body {
 /* Research panel */
 #research {
   position: fixed;
-  top: 100px;
-  right: 8px;
+  top: 62px;
+  left: 260px;
   width: 280px;
   max-height: calc(100vh - 260px);
   overflow-y: auto;
@@ -543,4 +675,95 @@ body {
 
 .hire-btn:hover {
   background: rgba(0, 230, 140, 0.1);
+}
+
+/* Status pills — one-glance machine diagnosis */
+.pill {
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+}
+
+.pill.up {
+  color: var(--up);
+  border: 1px solid rgba(0, 230, 140, 0.35);
+  background: rgba(0, 230, 140, 0.08);
+}
+
+.pill.down {
+  color: var(--down);
+  border: 1px solid rgba(255, 59, 92, 0.35);
+  background: rgba(255, 59, 92, 0.08);
+}
+
+.pill.warn {
+  color: var(--amber);
+  border: 1px solid rgba(255, 179, 0, 0.35);
+  background: rgba(255, 179, 0, 0.08);
+}
+
+/* Build bar: kind-colored glyph + affordability dimming */
+.build-btn .ico {
+  font-weight: 600;
+  color: var(--k, var(--cyan));
+  font-size: 12px;
+}
+
+.build-btn.cant {
+  opacity: 0.45;
+}
+
+.build-btn.cant:hover {
+  border-color: var(--grid);
+}
+
+.build-btn.cant .cost {
+  color: var(--down);
+}
+
+/* Browser surfaces — themed selection, scrollbars, focus (craft floor) */
+::selection {
+  background: rgba(0, 200, 255, 0.35);
+  color: var(--text);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1c2c3d;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #2a4056;
+}
+
+#panel,
+#research,
+#overlay-stats {
+  scrollbar-width: thin;
+  scrollbar-color: #1c2c3d transparent;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #toast,
+  .build-btn,
+  .hud-fill,
+  .tech-row {
+    transition: none !important;
+  }
 }
