@@ -101,7 +101,7 @@ export class BuildController {
     this.syncBar();
   }
 
-  update(): void {
+  update(blueprintArmed = false): void {
     const left = this.input.mouse.left;
     const right = this.input.mouse.right;
     const pressed = (code: string): boolean => this.input.keys.has(code) && !this.prevKeys.has(code);
@@ -122,7 +122,7 @@ export class BuildController {
         this.bar.children[i]?.classList.toggle("cant", (afford >> i & 1) === 0);
     }
 
-    if (left && !this.prevLeft) {
+    if (left && !this.prevLeft && !blueprintArmed) {
       const { tx, ty } = this.hoverTile();
       if (this.tool) {
         const err = this.world.canPlace(this.tool, tx, ty);

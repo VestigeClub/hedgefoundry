@@ -253,8 +253,9 @@ const build = new BuildController(
 const blueprint = new BlueprintController(world, camera, input, (kind) => COSTS[kind], toast);
 const research = new ResearchPanel(document.querySelector<HTMLElement>("#research")!, world);
 const help = new HelpOverlay(document.querySelector<HTMLElement>("#help")!);
+const canPerf = import.meta.env.DEV || params.has("debug");
 const perfEl = document.querySelector<HTMLElement>("#perf")!;
-let showPerf = import.meta.env.DEV || params.has("debug");
+let showPerf = canPerf;
 perfEl.classList.toggle("show", showPerf);
 let frameMsEma = 16.7;
 let tickMsEma = 0;
@@ -390,7 +391,7 @@ function renderFrame(_alpha: number): void {
     camera.zoomAt(input.mouse.x, input.mouse.y, wheel > 0 ? 1 / 1.15 : 1.15);
   }
 
-  build.update();
+  build.update(!!blueprint.mode);
   // Edge-trigger the research toggle: held KeyT must not flip the panel
   // ~60×/s (same rising-edge pattern as the build menu keys).
   const tDown = input.keys.has("KeyT");
@@ -439,7 +440,7 @@ function renderFrame(_alpha: number): void {
   // Dev perf HUD (F9): fps / tick ms / entity count, patched at 2 Hz.
   frameMsEma = frameMsEma * 0.9 + frameMs * 0.1;
   const f9 = input.keys.has("F9");
-  if (f9 && !prevF9) {
+  if (canPerf && f9 && !prevF9) {
     showPerf = !showPerf;
     perfEl.classList.toggle("show", showPerf);
   }
