@@ -102,19 +102,25 @@ export class BlueprintController {
 
   /** B cycles: copy → paste → off. */
   cycle(): void {
-    this.mode = this.mode === null ? "copy" : this.mode === "copy" ? "paste" : null;
     if (this.mode === null) {
-      this.snapshot = null;
-      this.dragStart = null;
-      this.dragNow = null;
+      this.mode = "copy";
+      this.onToast("BLUEPRINT: DRAG A RECTANGLE TO COPY");
+    } else if (this.mode === "copy") {
+      this.mode = "paste";
+      this.onToast("BLUEPRINT: CLICK TO STAMP");
+    } else {
+      this.exit();
     }
-    this.onToast(
-      this.mode === "copy"
-        ? "BLUEPRINT: DRAG A RECTANGLE TO COPY"
-        : this.mode === "paste"
-          ? "BLUEPRINT: CLICK TO STAMP"
-          : "BLUEPRINT OFF",
-    );
+  }
+
+  /** Escape backs out of blueprint mode entirely (audit issue A). */
+  exit(): void {
+    if (this.mode === null) return;
+    this.mode = null;
+    this.snapshot = null;
+    this.dragStart = null;
+    this.dragNow = null;
+    this.onToast("BLUEPRINT OFF");
   }
 
   update(): void {

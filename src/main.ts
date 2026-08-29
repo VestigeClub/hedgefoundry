@@ -306,6 +306,7 @@ let prevMinus = false;
 let prevStats = false;
 let prevEqual = false;
 let prevHelp = false;
+let prevEscape = false;
 
 function sizeCanvas(): void {
   const dpr = window.devicePixelRatio || 1;
@@ -399,15 +400,17 @@ function renderFrame(_alpha: number): void {
   statsPanel.update();
   // Pause + speed (audit B1): the Loop has supported this since M1, nothing
   // was wired. Edge-triggered like T so a held key flips exactly once.
-  const spaceDown = input.keys.has("Space");
-  if (spaceDown && !prevSpace) loop.paused = !loop.paused;
-  prevSpace = spaceDown;
-  const minusDown = input.keys.has("Minus");
-  if (minusDown && !prevMinus) loop.speed = loop.speed === 2 ? 1 : loop.speed === 4 ? 2 : 4;
-  prevMinus = minusDown;
-  const equalDown = input.keys.has("Equal");
-  if (equalDown && !prevEqual) loop.speed = loop.speed === 2 ? 4 : loop.speed === 1 ? 2 : 1;
-  prevEqual = equalDown;
+  if (world.state === "playing") {
+    const spaceDown = input.keys.has("Space");
+    if (spaceDown && !prevSpace) loop.paused = !loop.paused;
+    prevSpace = spaceDown;
+    const minusDown = input.keys.has("Minus");
+    if (minusDown && !prevMinus) loop.speed = loop.speed === 2 ? 1 : loop.speed === 4 ? 2 : 4;
+    prevMinus = minusDown;
+    const equalDown = input.keys.has("Equal");
+    if (equalDown && !prevEqual) loop.speed = loop.speed === 2 ? 4 : loop.speed === 1 ? 2 : 1;
+    prevEqual = equalDown;
+  }
   const hDown = input.keys.has("KeyH");
   if (hDown && !prevHelp) help.toggle();
   prevHelp = hDown;
@@ -419,6 +422,10 @@ function renderFrame(_alpha: number): void {
   const bDown = input.keys.has("KeyB");
   if (bDown && !prevBlueprint) blueprint.cycle();
   prevBlueprint = bDown;
+  // Escape backs out of blueprint mode (audit issue A) — only when armed.
+  const escDown = input.keys.has("Escape");
+  if (escDown && !prevEscape && blueprint.mode) blueprint.exit();
+  prevEscape = escDown;
   blueprint.update();
 
   if (demo) {
