@@ -19,6 +19,7 @@ import { Hud } from "./ui/hud";
 import { Panel } from "./ui/panel";
 import { BuildController } from "./ui/build";
 import { ResearchPanel } from "./ui/research";
+import { HelpOverlay } from "./ui/help";
 import { Sound } from "./ui/sound";
 import { renderReport } from "./ui/report";
 import { Demo, demoSpeed } from "./demo/autoplay";
@@ -242,6 +243,7 @@ const build = new BuildController(
   document.querySelector<HTMLElement>("#buildbar")!,
 );
 const research = new ResearchPanel(document.querySelector<HTMLElement>("#research")!, world);
+const help = new HelpOverlay(document.querySelector<HTMLElement>("#help")!);
 
 // Onboarding tutorial (DESIGN.md §8a): fresh world only, never ?demo. An
 // old save with no tutorial field means an established player — done.
@@ -282,6 +284,7 @@ let prevX = false;
 let prevSpace = false;
 let prevMinus = false;
 let prevEqual = false;
+let prevHelp = false;
 
 function sizeCanvas(): void {
   const dpr = window.devicePixelRatio || 1;
@@ -378,6 +381,9 @@ function renderFrame(_alpha: number): void {
   const equalDown = input.keys.has("Equal");
   if (equalDown && !prevEqual) loop.speed = loop.speed === 2 ? 4 : loop.speed === 1 ? 2 : 1;
   prevEqual = equalDown;
+  const hDown = input.keys.has("KeyH");
+  if (hDown && !prevHelp) help.toggle();
+  prevHelp = hDown;
 
   if (demo) {
     demo.update(frameMs);

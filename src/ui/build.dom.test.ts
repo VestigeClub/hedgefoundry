@@ -97,6 +97,16 @@ describe("build hotkeys", () => {
   });
 });
 
+describe("build hint", () => {
+  it("advertises the demolish/refund path (audit B3)", () => {
+    harness();
+    const hint = document.querySelector(".build-hint");
+    expect(hint).not.toBeNull();
+    expect(hint!.textContent).toContain("50% REFUND");
+    expect(hint!.textContent).toContain("SPACE — PAUSE");
+  });
+});
+
 describe("placement refusal", () => {
   /** Arming goes through the real key path because setTool toggles. */
   const tapKey = (keys: Set<string>, build: BuildController, code: string): void => {

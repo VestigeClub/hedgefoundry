@@ -165,7 +165,7 @@ export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "sendoff",
     title: "GO BIG",
-    body: "You know the loop. Scale the ladder to alpha, build the Roadshow ($120k), hire the quota, IPO. This is not a step — it's a send-off.",
+    body: "You know the loop. Scale the ladder to alpha, build the Roadshow ($120k), hire the quota, IPO. X demolishes — half refund. This is not a step — it's a send-off.",
     highlight: () => null,
     done: (_w, ctx) => ctx.elapsedMs >= 8_000,
   },

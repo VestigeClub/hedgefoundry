@@ -84,6 +84,13 @@ export class BuildController {
       });
       this.bar.appendChild(btn);
     }
+    // B3: the X key's refund path was undiscoverable — spell the chrome keys
+    // out under the bar. Static, patched once here.
+    const hint = document.createElement("div");
+    hint.className = "build-hint";
+    hint.textContent =
+      "X — DEMOLISH SELECTED (50% REFUND) · T — RESEARCH · H — HELP · SPACE — PAUSE";
+    this.bar.appendChild(hint);
   }
 
   setTool(kind: EntityKind | null): void {

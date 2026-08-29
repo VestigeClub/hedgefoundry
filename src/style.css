@@ -415,6 +415,15 @@ body {
   color: var(--up);
 }
 
+.build-hint {
+  align-self: center;
+  margin-left: 10px;
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
 /* Toast */
 #toast {
   position: fixed;
@@ -436,6 +445,55 @@ body {
 
 #toast.show {
   opacity: 1;
+}
+
+/* Help overlay (DESIGN.md §8 chrome, key H) */
+#help {
+  position: fixed;
+  inset: 0;
+  display: none;
+  z-index: 90;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 14, 20, 0.72);
+}
+
+#help.show {
+  display: flex;
+}
+
+.help-box {
+  padding: 22px 28px;
+  border: 1px solid var(--grid);
+  border-radius: 6px;
+  background: var(--panel);
+  font-size: 12px;
+}
+
+.help-box dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 6px 18px;
+  margin: 10px 0;
+}
+
+.help-box dt {
+  color: var(--cyan);
+  white-space: nowrap;
+}
+
+.help-box dd {
+  color: var(--text);
+}
+
+.help-title {
+  color: var(--text);
+  letter-spacing: 0.12em;
+}
+
+.help-dim {
+  color: var(--dim);
+  font-size: 10px;
 }
 
 /* Research panel */
