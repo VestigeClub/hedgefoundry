@@ -9,6 +9,7 @@ import { Rng } from "./rng";
 import { Crafter } from "./production";
 import { RECIPES } from "./recipes";
 import { World, type BeltItem, type BroType, type Dir, type Entity } from "./world";
+import type { ClosedPosition, Position } from "./positions";
 import type { Item } from "./items";
 
 const SAVE_KEY = "hedgefoundry-save-v2";
@@ -23,6 +24,10 @@ interface SaveFormat {
     timeMs: number;
     /** Class-mode threat clock; absent in older saves → 1. */
     pace?: number;
+    prices?: Record<string, number>;
+    positions?: Position[];
+    positionLog?: ClosedPosition[];
+    nextPositionId?: number;
     totals: Record<string, number>;
     /** Added with the void rule; absent in saves written before it → zeros. */
     writtenOff?: Record<string, number>;
@@ -147,6 +152,10 @@ export function serializeWorld(w: World, mapOpts: MapGenOpts, tutorial?: { step:
       capital: w.capital,
       timeMs: w.timeMs,
       pace: w.pace,
+      prices: { ...w.prices },
+      positions: w.positions.map((p) => ({ ...p })),
+      positionLog: w.positionLog.map((p) => ({ ...p })),
+      nextPositionId: w.nextPositionId,
       totals: { ...w.totals },
       writtenOff: { ...w.writtenOff },
       tech: { ...w.tech },
@@ -205,6 +214,10 @@ export function deserializeWorld(json: string): { world: World; map: TileMap; fe
   w.state = save.world.state;
   w.marginCallMs = save.world.marginCallMs;
   w.broSpawnTimerMs = save.world.broSpawnTimerMs;
+  w.prices = { ...(save.world.prices ?? {}) };
+  w.positions = (save.world.positions ?? []).map((p) => ({ ...p }));
+  w.positionLog = (save.world.positionLog ?? []).map((p) => ({ ...p }));
+  w.nextPositionId = save.world.nextPositionId ?? 1;
   w.hqId = save.world.hqId;
   w.lossReason = save.world.lossReason;
   w.brosKilled = save.world.brosKilled;

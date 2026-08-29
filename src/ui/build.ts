@@ -24,6 +24,7 @@ export const BUILD_ORDER: BuildDef[] = [
   { kind: "trader", key: "q", label: "TRADER" },
   { kind: "tower", key: "e", label: "COMPLIANCE TOWER" },
   { kind: "roadshow", key: "g", label: "ROADSHOW" },
+  { kind: "trading", key: "f", label: "TRADING DESK" },
 ];
 
 // Input stores KeyboardEvent.code — map display keys to build kinds.
@@ -41,6 +42,7 @@ const KEY_TO_KIND: Record<string, EntityKind> = {
   KeyQ: "trader",
   KeyE: "tower",
   KeyG: "roadshow",
+  KeyF: "trading",
 };
 
 /** Pairs for the per-frame key scan, materialised once (no hot-path allocation). */

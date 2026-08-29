@@ -7,6 +7,7 @@ import { createBuffer, type Buffer } from "./production";
 import { Crafter } from "./production";
 import { RECIPES } from "./recipes";
 import { DEFAULT_TECH, type TechState } from "./research";
+import { IMPACT_PER_CLOSE, MAX_OPEN_POSITIONS, POSITION_LIFE_MS, pnlOf, type ClosedPosition, type Position } from "./positions";
 
 export type Dir = "N" | "E" | "S" | "W";
 export const DIRS: readonly Dir[] = ["N", "E", "S", "W"];
@@ -28,6 +29,7 @@ export type EntityKind =
   | "tower"
   | "hq"
   | "roadshow"
+  | "trading"
   | "bro";
 
 export type BroType = "analyst" | "trader" | "md" | "quant";
@@ -112,6 +114,7 @@ export const SIZES: Record<EntityKind, number> = {
   tower: 2,
   hq: 4,
   roadshow: 4,
+  trading: 2,
   bro: 1,
 };
 
@@ -135,6 +138,7 @@ export const COSTS: Record<EntityKind, number> = {
   tower: 15_000,
   hq: 0,
   roadshow: 120_000,
+  trading: 30_000,
   bro: 0,
 };
 
@@ -153,6 +157,7 @@ export const KIND_LABEL: Record<EntityKind, string> = {
   tower: "COMPLIANCE TOWER",
   hq: "FUND OFFICE",
   roadshow: "ROADSHOW",
+  trading: "TRADING DESK",
   bro: "FINANCE BRO",
 };
 
@@ -236,6 +241,11 @@ export class World {
   hqId = -1;
   /** Transient render cues; drained every frame, never saved, capped. */
   fx: FxCue[] = [];
+  // Trading desk state (§5.10): live tape marks, open positions, history.
+  prices: Record<string, number> = {};
+  positions: Position[] = [];
+  positionLog: ClosedPosition[] = [];
+  nextPositionId = 1;
 
   constructor(opts: WorldOpts) {
     this.map = opts.map;
@@ -342,6 +352,7 @@ export class World {
       if (tx < e.x + e.w && tx + s > e.x && ty < e.y + e.h && ty + s > e.y) return "OCCUPIED";
     }
     if (kind === "miner" && !this.feedAt(tx, ty)) return "NEEDS DATA FEED";
+    if (kind === "trading" && this.tech.positions < 1) return "REQUIRES RESEARCH — POSITIONS DESK";
     if (this.capital < COSTS[kind]) return "INSUFFICIENT CAPITAL";
     return null;
   }
@@ -476,6 +487,63 @@ export class World {
     return false;
   }
 
+  // ── Trading desk (§5.10) ───────────────────────────────────────────────
+
+  ingestPrice(symbol: string, px: number): void {
+    this.prices[symbol] = px;
+  }
+
+  /** Take a capital position. Returns an error literal, or null on success. */
+  openPosition(symbol: string, dir: "long" | "short", sizeUsd: number): string | null {
+    const desk = [...this.entities.values()].find((e) => e.kind === "trading" && this.powered.has(e.id));
+    if (!desk) return "NO TRADING DESK — BUILD AND POWER ONE";
+    if (this.capital < sizeUsd) return "INSUFFICIENT CAPITAL";
+    if (this.positions.length >= MAX_OPEN_POSITIONS) return "POSITION LIMIT — 5 OPEN";
+    const px = this.prices[symbol];
+    if (px === undefined || px <= 0) return "NO MARKET DATA";
+    this.capital -= sizeUsd;
+    const id = this.nextPositionId++;
+    this.positions.push({
+      id,
+      symbol,
+      dir,
+      sizeUsd,
+      entryPx: px,
+      openedMs: this.timeMs,
+      closesMs: this.timeMs + POSITION_LIFE_MS,
+      deskId: desk.id,
+    });
+    this.logEvent(`OPEN ${dir.toUpperCase()} ${symbol} $${Math.round(sizeUsd)}`);
+    return null;
+  }
+
+  /** Manual close at the current price. */
+  closePosition(id: number): void {
+    const i = this.positions.findIndex((p) => p.id === id);
+    if (i === -1) return;
+    const [p] = this.positions.splice(i, 1);
+    this.settlePosition(p!);
+  }
+
+  /** Settle a position: margin + pnl back to capital, logged, +Impact. */
+  settlePosition(p: Position): void {
+    const px = this.prices[p.symbol];
+    if (px === undefined) return;
+    const pnl = pnlOf(p, px);
+    this.capital = Math.min(this.capitalCapacity(), this.capital + p.sizeUsd + pnl);
+    this.positionLog.push({ t: this.timeMs, symbol: p.symbol, dir: p.dir, sizeUsd: p.sizeUsd, pnl });
+    if (this.positionLog.length > 100) this.positionLog.shift();
+    const desk = this.entities.get(p.deskId);
+    if (desk && this.powered.has(desk.id)) {
+      this.working.add(desk.id);
+      const cx = Math.floor((desk.x + desk.w / 2) / IMPACT_CELL);
+      const cy = Math.floor((desk.y + desk.h / 2) / IMPACT_CELL);
+      if (cx >= 0 && cy >= 0 && cx < this.impactW && cy < this.impactH) {
+        this.impact[cy * this.impactW + cx] = (this.impact[cy * this.impactW + cx] ?? 0) + IMPACT_PER_CLOSE;
+      }
+      this.cue("sale", desk.x + 1, desk.y + 1, Math.round(pnl));
+    }
+  }
   /** Recompute the capital grid + brownout multiplier. */
   recomputePower(): void {
     const powerList: Array<{ id: number; kind: "source" | "link" | "consumer"; x: number; y: number; w: number; h: number }> = [];
@@ -539,6 +607,8 @@ export function burnOf(e: Entity): number {
       return 25;
     case "roadshow":
       return 100;
+    case "trading":
+      return 10;
     default:
       return 0;
   }

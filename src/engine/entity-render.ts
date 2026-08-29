@@ -25,6 +25,7 @@ export const KIND_COLOR: Record<string, string> = {
   tower: "#fb7185",
   roadshow: "#fbbf24",
   bro: "#f472b6",
+  trading: "#00c8ff",
 };
 
 export const KIND_GLYPH: Record<string, string> = {
@@ -42,6 +43,7 @@ export const KIND_GLYPH: Record<string, string> = {
   tower: "CT",
   hq: "HQ",
   roadshow: "IPO",
+  trading: "TD",
   bro: "",
 };
 

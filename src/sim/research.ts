@@ -21,6 +21,7 @@ export interface TechState {
   towerDamage: number;
   compDiscount: number;
   briefEfficiency: number;
+  positions: number;
 }
 
 export const DEFAULT_TECH: TechState = {
@@ -37,6 +38,7 @@ export const DEFAULT_TECH: TechState = {
   towerDamage: 0,
   compDiscount: 0,
   briefEfficiency: 0,
+  positions: 0,
 };
 
 export interface TechDef {
@@ -68,6 +70,7 @@ export const TECHS: TechDef[] = [
   { id: "comp-discount-1", label: "COMP DISCOUNT I", desc: "Hire comp −15%", cost: 8, effect: { compDiscount: 1 } },
   { id: "comp-discount-2", label: "COMP DISCOUNT II", desc: "Hire comp −30%", cost: 12, requires: ["comp-discount-1"], effect: { compDiscount: 2 } },
   { id: "brief-efficiency", label: "BRIEF EFFICIENCY", desc: "Legal Printers make 3", cost: 10, effect: { briefEfficiency: 1 } },
+  { id: "positions-1", label: "POSITIONS DESK", desc: "Unlock the Trading Desk", cost: 8, effect: { positions: 1 } },
 ];
 
 export const TECH_BY_ID = new Map(TECHS.map((t) => [t.id, t]));

@@ -1,6 +1,7 @@
 import type { World, Entity } from "../sim/world";
 import { BRO_STATS, HIRE_QUOTA, KIND_LABEL, ROADSHOW_ALPHA_NEEDED, VAULT_CAPACITY } from "../sim/world";
 import { RECIPE_LABEL, sellableFuels } from "../sim/recipes";
+import { POSITION_SIZE_USD, pnlOf } from "../sim/positions";
 import { scaleFor, type Crafter } from "../sim/production";
 import { ITEM_LABEL, type Item } from "../sim/items";
 
@@ -18,12 +19,25 @@ export class Panel {
     private readonly world: World,
   ) {
     el.addEventListener("click", (ev) => {
-      if ((ev.target as HTMLElement).closest("[data-hire]") && this.selected?.kind === "bro") {
+      const hire = (ev.target as HTMLElement).closest<HTMLElement>("[data-hire]");
+      if (hire && this.selected?.kind === "bro") {
         const ok = this.world.hireBro(this.selected.id);
         if (!ok) this.toast("NOT ENOUGH CAPITAL FOR COMP");
         else this.toast(`HIRED — QUOTA ${this.world.hired}/${HIRE_QUOTA}`);
         this.selected = null;
         this.el.classList.remove("open");
+      }
+      const open = (ev.target as HTMLElement).closest<HTMLElement>("[data-open]");
+      if (open && this.selected?.kind === "trading") {
+        const [symbol, dir] = (open.dataset.open ?? "").split(":") as [string, "long" | "short"];
+        const err = this.world.openPosition(symbol, dir, POSITION_SIZE_USD);
+        if (err) this.toast(err);
+        this.render();
+      }
+      const close = (ev.target as HTMLElement).closest<HTMLElement>("[data-close]");
+      if (close && this.selected?.kind === "trading") {
+        this.world.closePosition(Number(close.dataset.close));
+        this.render();
       }
     });
   }
@@ -111,6 +125,23 @@ export class Panel {
       }
       if (e.trader) {
         parts.push(`<div class="p-row">ARM: ${e.trader.dir} · CYCLE: ${(2 / (1 + 0.25 * w.tech.traderSpeed)).toFixed(1)}s</div>`);
+      }
+      if (e.kind === "trading") {
+        for (const s of ["BTC", "ETH", "SOL"]) {
+          const px = w.prices[s];
+          parts.push(`<div class="p-row">${s}: ${px === undefined ? "NO TAPE" : fmt(px)} <button class="hire-btn" data-open="${s}:long">LONG</button> <button class="hire-btn" data-open="${s}:short">SHORT</button></div>`);
+        }
+        for (const p of w.positions) {
+          const live = w.prices[p.symbol];
+          const pnl = live === undefined ? 0 : pnlOf(p, live);
+          const left = Math.max(0, p.closesMs - w.timeMs);
+          parts.push(
+            `<div class="p-row">#${p.id} ${p.dir.toUpperCase()} ${p.symbol} $${fmt(p.sizeUsd)} · <span class="pill ${pnl >= 0 ? "up" : "down"}">${pnl >= 0 ? "+" : "−"}$${fmt(Math.abs(pnl))}</span> · ${Math.ceil(left / 1000)}s <button class="hire-btn" data-close="${p.id}">CLOSE</button></div>`,
+          );
+        }
+        for (const c of w.positionLog.slice(-10).reverse()) {
+          parts.push(`<div class="p-row dim">${c.dir.toUpperCase()} ${c.symbol} $${fmt(c.sizeUsd)} → ${c.pnl >= 0 ? "+" : "−"}$${fmt(Math.abs(c.pnl))}</div>`);
+        }
       }
       if (e.kind === "link") parts.push(`<div class="p-row">RANGE: 7 tiles</div>`);
       if (e.kind === "vault") parts.push(`<div class="p-row">+${fmt(VAULT_CAPACITY)} CAPACITY</div>`);

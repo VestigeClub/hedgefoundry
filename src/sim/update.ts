@@ -11,6 +11,7 @@ import { ITEMS, type Item } from "./items";
 import { acceptsItem, bufferAdd, bufferCount, bufferTake, inputBufferOf, isTerminalSink, scaleFor, type Buffer } from "./production";
 import { sellableFuels } from "./recipes";
 import { TECH_BY_ID, applyTech } from "./research";
+import { updatePositions } from "./positions";
 
 export function tickWorld(w: World, dtMs: number): void {
   if (w.state !== "playing") return; // game over: freeze the sim
@@ -63,6 +64,7 @@ export function tickWorld(w: World, dtMs: number): void {
     }
   }
   spawnBros(w, dtMs);
+  updatePositions(w);
   updateBros(w, dtMs);
 }
 

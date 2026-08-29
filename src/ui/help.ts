@@ -10,8 +10,7 @@ export class HelpOverlay {
     this.el.innerHTML = `
       <div class="help-box">
         <div class="help-title">KEYS</div>
-        <dl>
-          <dt>1–9, 0, Q, E, G</dt><dd>build menu</dd>
+          <dt>1–9, 0, Q, E, F, G</dt><dd>build menu</dd>
           <dt>R</dt><dd>rotate belt / trader</dd>
           <dt>X</dt><dd>demolish selected (50% refund)</dd>
           <dt>I</dt><dd>stats panel</dd>

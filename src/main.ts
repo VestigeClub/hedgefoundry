@@ -114,7 +114,10 @@ const ticker = new Ticker(
 );
 
 const feed = new FeedClient(relayBase(), WORLD_SEED, {
-  onFrame: (f) => ticker.onFrame(f),
+  onFrame: (f) => {
+    ticker.onFrame(f);
+    if (f.ch === "ctx") world.ingestPrice(f.coin, f.mark);
+  },
   onStatus: (s) => ticker.setStatus(s),
 });
 

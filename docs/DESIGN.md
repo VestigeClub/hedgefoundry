@@ -390,7 +390,7 @@ payback rows are measured by `src/sim/reachability.test.ts`, not estimated.
   2M, +250k per vault (`VAULT_CAPACITY`); never binding at these incomes.
 - **Costs**: Miner 4k, Cleaner 8k, Analytics 20k, Factory 45k, Printer 12k,
   Research 30k, Funding 12k, Vault 6k, Link 2k, Belt 800, Trader 4k,
-  Tower 15k, Roadshow 120k.
+  Tower 15k, Trading Desk 30k (§5.10), Roadshow 120k.
 - **Fuel prices** (a desk sells its fuel, it does not burn it): clean 250,
   signal 900, alpha 3 500. Priced so every rung of the ladder returns its
   build cost in about the same time — that is what makes the choice one of
