@@ -445,7 +445,7 @@ function renderFrame(_alpha: number): void {
       el.className = `chip${loop.paused ? " warn" : ""}`;
     }
   }
-  // Status chip: capital deficit / wasted output / IPO ready / wave inbound.
+  // Status chip: persistent ambient alerts + the transient waste override.
   {
     const el = document.querySelector<HTMLElement>("#status-chip")!;
     const voided = Object.values(world.writtenOff).reduce((a, b) => a + b, 0);
@@ -455,18 +455,20 @@ function renderFrame(_alpha: number): void {
     }
     let msg = "";
     let cls = "";
-    if (world.capital < world.demandPerSec * 10) {
-      msg = "CAPITAL DEFICIT";
-      cls = "warn";
-    } else if (nowMs - lastWasteAt < 5_000) {
+    if (nowMs - lastWasteAt < 3_000) {
+      // Wasted output names the concrete mistake — it overrides the ambient
+      // state for 3 s after it fires (audit B4).
       msg = "OUTPUT WASTED";
+      cls = "warn";
+    } else if (world.broSpawnTimerMs < 10_000) {
+      msg = "WAVE INBOUND";
+      cls = "warn";
+    } else if (world.marginCallMs > 0) {
+      msg = "MARGIN CALL";
       cls = "warn";
     } else if (world.hired >= HIRE_QUOTA) {
       msg = "IPO READY";
       cls = "good";
-    } else if (world.broSpawnTimerMs < 5_000) {
-      msg = "WAVE INBOUND";
-      cls = "warn";
     }
     if (msg !== el.textContent) {
       el.textContent = msg;
