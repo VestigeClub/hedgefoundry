@@ -303,6 +303,34 @@ client uses its fixed sim seed values — no server needed anywhere.
   - `LIVE`/`SIM` chip top-right; `v0.x` build chip.
 - Zoom 0.5–3, pan with WASD/edge/middle-drag, tile highlight hover.
 
+### 8a. Onboarding tutorial
+
+Seamless, event-driven onboarding — a bottom-left **coach card** plus a canvas
+highlight, never a modal wall. Shown on a fresh world with no buildings when
+no save is resumed; never in `?demo`. Skippable; skip is remembered in the
+save. Progress persists as an optional save field (`tutorial?`, no version
+bump — same convention as `writtenOff?`). Steps advance only when the player
+does the thing; each `done` predicate reads `World` state. The engine
+(`src/tutorial/`) checks triggers at ~10 Hz; every quoted number is from §11.
+
+| # | Card title | Trigger (`done` on World) | Highlight |
+|---|---|---|---|
+| 0 | WELCOME TO THE FUND | camera moved ≥ 0.5 tiles or 12 s | HQ |
+| 1 | FIRST EXTRACTION (`1`) | a `miner` exists | nearest feed patch |
+| 2 | MOVE THE TAPE (`0`) | a `belt` adjacent to a miner | the miner |
+| 3 | CLEAN IT (`2`) | a `cleaner` exists | cleaner spot |
+| 4 | FUND IT (`7`) | a `funding` exists | funding spot |
+| 5 | MONEY FLOWING | capital trough + $10k | — |
+| 6 | DEFEND (`e`) | a `tower` exists | HQ |
+| 7 | HIRE | `hired ≥ 1` | nearest bro, else HQ |
+| 8 | RESEARCH (`T`) | `researchTarget !== null` | research panel |
+| 9 | GO BIG | click-through → done forever | — |
+
+Presentation: pulsing cyan (`#00C8FF`) world-space ring on the existing
+canvas; chain diagrams as inline HTML chips; failure-aware one-line trouble
+tips (brownout / starved line) reuse the same card slot. Card copy is
+finance-native, ≤ 2 lines body.
+
 ## 9. End-game report (victory AND defeat)
 Full-screen report: AUM/capital curve, production totals per item, bros hired
 by type, waves survived, research tree filled, timeline of key events, final
