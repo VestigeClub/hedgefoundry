@@ -21,6 +21,8 @@ interface SaveFormat {
     nextId: number;
     capital: number;
     timeMs: number;
+    /** Class-mode threat clock; absent in older saves → 1. */
+    pace?: number;
     totals: Record<string, number>;
     /** Added with the void rule; absent in saves written before it → zeros. */
     writtenOff?: Record<string, number>;
@@ -144,6 +146,7 @@ export function serializeWorld(w: World, mapOpts: MapGenOpts, tutorial?: { step:
       nextId: w.nextId,
       capital: w.capital,
       timeMs: w.timeMs,
+      pace: w.pace,
       totals: { ...w.totals },
       writtenOff: { ...w.writtenOff },
       tech: { ...w.tech },
@@ -184,7 +187,7 @@ function parseSave(json: string): SaveFormat {
 export function deserializeWorld(json: string): { world: World; map: TileMap; feeds: FeedPatch[]; tutorial?: { step: number; done: boolean } } {
   const save = parseSave(json);
   const { map, feeds } = generateMap(save.map);
-  const w = new World({ map, feeds, seed: save.map.seed, rng: new Rng(save.map.seed, save.world.rngState) });
+  const w = new World({ map, feeds, seed: save.map.seed, rng: new Rng(save.map.seed, save.world.rngState), pace: save.world.pace ?? 1 });
   w.nextId = save.world.nextId;
   w.capital = save.world.capital;
   w.timeMs = save.world.timeMs;

@@ -187,10 +187,13 @@ export interface WorldOpts {
   feeds: FeedPatch[];
   seed: number;
   startCapital?: number;
+  /** Threat-clock multiplier (class mode runs 2×): waves + evolution only. */
+  pace?: number;
   rng?: Rng;
 }
 
 export class World {
+  readonly pace: number;
   map: TileMap;
   feeds: FeedPatch[];
   rng: Rng;
@@ -237,6 +240,7 @@ export class World {
   constructor(opts: WorldOpts) {
     this.map = opts.map;
     this.feeds = opts.feeds;
+    this.pace = opts.pace ?? 1;
     this.rng = opts.rng ?? new Rng(opts.seed);
     this.capital = opts.startCapital ?? STARTING_CAPITAL;
     this.impactW = Math.ceil(this.map.w / IMPACT_CELL);

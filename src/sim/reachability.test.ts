@@ -554,8 +554,14 @@ describe("win reachability", () => {
    * Every rule below is a money rule the player can read off the panel — no
    * injected capital, no pumped belt speed, no preloaded win condition.
    */
-  it("scripted play reaches the IPO inside the 50-minute window", () => {
-    const w = makeWorld();
+  const runScriptedArc = (
+    pace: number,
+    minutes: number,
+    startCapital = STARTING_CAPITAL,
+  ): { w: World; final: string; arc: string[]; tiers: number[] } => {
+    const { map, feeds } = generateMap(MAP_OPTS);
+    const w = new World({ map, feeds, seed: MAP_OPTS.seed, startCapital, pace });
+    w.spawnHQ();
     // Corners nearest the office first, richest as the tie-break. Ordering by
     // richness alone scattered the plant across a 256×256 map: cells landed
     // beyond any power corridor and stayed dark — a desk with no power sells
@@ -622,7 +628,7 @@ describe("win reachability", () => {
       return chain;
     };
 
-    for (let i = 0; i < 90_000; i++) {
+    for (let i = 0; i < minutes * 60 * 30; i++) {
       tickWorld(w, DT);
       if (w.state !== "playing") break;
       if (i % 30 !== 0) continue; // one player action per sim second
@@ -823,10 +829,23 @@ describe("win reachability", () => {
     // research desk's alpha feed jammed at the second tech and the alpha
     // economy never switched on anywhere on this map.
     const tiers = arc.map((l) => Number(/tier=(\d+)/.exec(l)?.[1] ?? 0));
+    return { w, final, arc, tiers };
+  };
+
+  it("scripted play reaches the IPO inside the 50-minute window", () => {
+    const { final, tiers } = runScriptedArc(1, 50);
     expect(tiers.length).toBeGreaterThan(0);
     expect(Math.max(...tiers)).toBeGreaterThanOrEqual(2);
     expect(final, final).toContain("state=won");
     expect(Number(final.match(/hired=(\d+)/)?.[1])).toBeGreaterThanOrEqual(HIRE_QUOTA);
+  }, 180_000);
+
+  // Class mode (§8a of the plan): a 2× threat clock — waves twice as often,
+  // evolution twice as fast — must still be winnable, inside 40 sim-min
+  // (= 20 wall-min at the 2× loop speed the mode boots with).
+  it("class pace (2×) still reaches the IPO inside 40 sim-min", () => {
+    const { final } = runScriptedArc(2, 40);
+    expect(final, final).toContain("state=won");
   }, 180_000);
 
   /**

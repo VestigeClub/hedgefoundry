@@ -59,12 +59,14 @@ const MAP_OPTS = { width: MAP_W, height: MAP_H, seed: WORLD_SEED, startClearRadi
 const camera = new Camera(innerWidth, innerHeight);
 const input = new Input(canvas);
 const gen = generateMap(MAP_OPTS);
-let world = new World({ map: gen.map, feeds: gen.feeds, seed: WORLD_SEED });
 let feeds: FeedPatch[] = gen.feeds;
-
-// M7: ?demo starts fresh, never resumes an autosave.
-const isDemo = new URLSearchParams(location.search).has("demo");
-if (isDemo) clearStorageSave();
+// ?demo and ?class start fresh, never resuming an autosave. Class boots the
+// threat clock (waves + evolution) at 2× — the professor's 20-minute arc.
+const params = new URLSearchParams(location.search);
+const isDemo = params.has("demo");
+const isClass = params.has("class");
+if (isDemo || isClass) clearStorageSave();
+let world = new World({ map: gen.map, feeds: gen.feeds, seed: WORLD_SEED, pace: isClass ? 2 : 1 });
 
 // M6: resume an autosave if present; discard corrupt data.
 const saved = loadFromStorage();
@@ -249,10 +251,11 @@ const help = new HelpOverlay(document.querySelector<HTMLElement>("#help")!);
 const minimap = new Minimap(document.querySelector<HTMLElement>("#minimap")!, world, camera);
 const statsPanel = new StatsPanel(document.querySelector<HTMLElement>("#stats")!, world);
 
-// Onboarding tutorial (DESIGN.md §8a): fresh world only, never ?demo. An
+// Onboarding tutorial (DESIGN.md §8a): fresh world only, never ?demo/?class. An
 // old save with no tutorial field means an established player — done.
 const freshWorld = [...world.entities.values()].every((e) => e.kind === "hq");
-const tutorial = isDemo ? null : new Tutorial(savedTutorial ?? { step: 0, done: !freshWorld });
+const tutorial = isDemo || isClass ? null : new Tutorial(savedTutorial ?? { step: 0, done: !freshWorld });
+if (isClass) document.querySelector<HTMLElement>("#title-chip")!.textContent += " · CLASS";
 const tutorialCard = tutorial
   ? new TutorialCard(document.querySelector<HTMLElement>("#tutorial")!, () => tutorial.skip())
   : null;
@@ -335,6 +338,7 @@ const loop = new Loop({
     }
   },
 });
+if (isClass) loop.speed = 2;
 
 function renderFrame(_alpha: number): void {
   // Wall-clock delta: the Loop passes an interpolation alpha to render, but

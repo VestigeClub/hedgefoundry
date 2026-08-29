@@ -470,7 +470,7 @@ function updateImpact(w: World, dtMs: number): void {
     // Market saturation tracks the fund's footprint: a 300 $/s burn base
     // reaches half saturation in ~8 minutes, which is the pacing the
     // 250-hire quota and the wave meter above are tuned against.
-    w.evolution = Math.min(1, w.evolution + added * EVOLUTION_PER_IMPACT);
+    w.evolution = Math.min(1, w.evolution + added * EVOLUTION_PER_IMPACT * w.pace);
   }
   // diffuse + decay (new array per tick; 4k floats — fine at 30 Hz)
   const src = w.impact;
@@ -502,7 +502,7 @@ const BRO_CAP_BASE = 24;
  * hire 250 and let compliance cull the rest.
  */
 function spawnBros(w: World, dtMs: number): void {
-  w.broSpawnTimerMs -= dtMs;
+  w.broSpawnTimerMs -= dtMs * w.pace;
   if (w.broSpawnTimerMs > 0) return;
   const broCount = countBros(w);
   const cap = Math.round(BRO_CAP_BASE * (0.5 + w.evolution));
