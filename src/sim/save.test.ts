@@ -127,7 +127,7 @@ describe("save/load", () => {
     roadshow.roadshow!.progress = 42;
     const towerSpot = findSpot(w, "tower", 40, 40);
     const tower = w.placeEntity("tower", towerSpot.x, towerSpot.y)!;
-    bufferAdd(tower.input!, "brief", 3);
+    bufferAdd(tower.input!, "brief", 3); // on top of the 4 starter briefs
 
     const { world: b } = deserializeWorld(serializeWorld(w, MAP_OPTS));
     expect(b.broSpawnTimerMs).toBe(1234);
@@ -138,7 +138,7 @@ describe("save/load", () => {
     expect(rb.roadshow!.progress).toBe(42);
     expect(rb.input!.items.alpha).toBe(5);
     const tb = [...b.entities.values()].find((e) => e.kind === "tower")!;
-    expect(tb.input!.items.brief).toBe(3);
+    expect(tb.input!.items.brief).toBe(7); // starter 4 + fed 3 round-trip
     const bros = [...b.entities.values()].filter((e) => e.kind === "bro");
     expect(bros.length).toBe(2);
   });

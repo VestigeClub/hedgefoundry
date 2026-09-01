@@ -154,3 +154,45 @@ produce screenshot evidence; every claim in the two logs traces to a commit, a t
 or a screenshot — the withdrawn findings at the bottom of `docs/PLAYTEST.md` are that
 rule working in reverse (probes that looked like defects were checked against source
 and withdrawn rather than "fixed").
+
+---
+
+# Session — unfamiliar-user pass and onboarding rework (2026-09-01)
+
+Prompt: *"Can you audit the game end to end and use headless browser & vision to
+play it, catch bugs/errors/inefficiencies, and fix what needs fixing before
+submission?"* — plus the owner's report of a real unfamiliar player: he kept
+losing, said the loop was confusing, a box flashed over the panel, and the
+crypto names meant nothing to him.
+
+Findings verified live (headless Chromium on the dev bundle, `?debug` handle):
+
+- **HF-1** — the minimap (audit B5) sits fixed top-left **under the inspector
+  panel**: any selected entity showed a live, repainting box bleeding through
+  the panel — the "flashing box" the tester reported. Fixed by z-order
+  (`#minimap` z-5 under the opaque panel z-10, `src/style.css`).
+- **HF-2** — the tutorial taught the money half of the loop and stopped before
+  the parts that actually kill you: **power** (desk/Vault within 7 tiles),
+  **ammo** (a tower without briefs cannot fire). Rewritten as eleven steps
+  (DESIGN.md §8a): the goal first, then mine → belt → cleaner → funding desk
+  → income → armed tower → printer-fed ammo → hire → research, each step
+  naming the tool key and the real number.
+- **HF-3** — a freshly built tower was silent until an entire printer chain
+  existed; wave 1 met no gunfire. Towers now ship with 4 briefs (creation is
+  ledgered in `w.totals`, conservation test intact) and `troubleTip` names a
+  powered, dry tower ("belt Legal Briefs from a printer into the tower").
+- **HF-4** — the tape showed BTC/ETH/SOL prices. In-game labels are now fake
+  instruments — **FLUX / ORBIT / ZENITH** (`INSTRUMENT` in `src/sim/world.ts`)
+  across ticker, trading desk, positions, and event log; internal symbols
+  (wire, saves, relay fixture) stay stable.
+
+Verification: `npm run check` — typecheck clean, **176 tests / 26 files
+green**, production bundle `index-c-Xw1t57.js` (101.8 kB, 35.7 kB gz). Live
+repro of the tester's death loop on the new build: tower shipped 4/4 briefs,
+powered from the vault, fired every round (ammo 4→0, 1 kill), then stood dry
+with no printer — overrun at wave 10. That is exactly the hole STEP 7 — AMMO
+now closes; screenshot `playtest/06-onboarding.webp`. A powered, dry,
+unresupplied tower is now impossible to mistake for a working defense.
+
+Honest limit unchanged: the unfamiliar player is one person, and his session
+was post-hoc verbal report, not observed play.

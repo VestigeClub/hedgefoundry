@@ -3,7 +3,7 @@ import type { FeedPatch } from "../world/mapgen";
 import { computePowered, brownoutMultiplier } from "./power";
 import type { Item } from "./items";
 import { Rng } from "./rng";
-import { createBuffer, type Buffer } from "./production";
+import { bufferAdd, createBuffer, type Buffer } from "./production";
 import { Crafter } from "./production";
 import { RECIPES } from "./recipes";
 import { DEFAULT_TECH, type TechState } from "./research";
@@ -186,6 +186,10 @@ export const IMPACT_CELL = 4; // tiles per impact cell (64×64 on a 256 map)
 
 /** Defence and the roadshow bill whether or not they act (DESIGN.md §5.4). */
 export const ALWAYS_ON: Partial<Record<EntityKind, true>> = { tower: true, roadshow: true };
+
+/** Player-facing instrument names. Internal symbols (wire, saves, prices)
+ * stay stable; these labels are what the game shows. */
+export const INSTRUMENT: Record<string, string> = { BTC: "FLUX", ETH: "ORBIT", SOL: "ZENITH" };
 
 export interface WorldOpts {
   map: TileMap;
@@ -390,6 +394,11 @@ export class World {
       case "tower":
         e.tower = { atkCdMs: 0 };
         e.input = createBuffer(8);
+        // A tower bought in a raid is bought to fire: it ships with 4 briefs
+        // so the first wave meets gunfire while the player still owes a
+        // printer. Sustained ammo is the printer's job (§5.8, audit HF-3).
+        bufferAdd(e.input, "brief", 4);
+        this.totals.brief += 4; // creation enters the conservation ledger at build time
         break;
       case "roadshow":
         e.roadshow = { progress: 0 };
@@ -490,7 +499,6 @@ export class World {
   }
 
   // ── Trading desk (§5.10) ───────────────────────────────────────────────
-
   ingestPrice(symbol: string, px: number): void {
     this.prices[symbol] = px;
   }
@@ -515,7 +523,7 @@ export class World {
       closesMs: this.timeMs + POSITION_LIFE_MS,
       deskId: desk.id,
     });
-    this.logEvent(`OPEN ${dir.toUpperCase()} ${symbol} $${Math.round(sizeUsd)}`);
+    this.logEvent(`OPEN ${dir.toUpperCase()} ${INSTRUMENT[symbol] ?? symbol} $${Math.round(sizeUsd)}`);
     return null;
   }
 

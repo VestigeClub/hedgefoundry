@@ -17,11 +17,11 @@ describe("tutorial coach card", () => {
   it("swaps title/body/chips on setStep", () => {
     const { card, el } = harness();
     card.setStep(TUTORIAL_STEPS[0]!);
-    expect(el.querySelector(".tut-title")!.textContent).toBe("WELCOME TO THE FUND");
-    expect(el.querySelector(".tut-body")!.textContent).toContain("$400k");
+    expect(el.querySelector(".tut-title")!.textContent).toBe("THE FUND — YOUR GOAL");
+    expect(el.querySelector(".tut-body")!.textContent).toContain("hire 250");
 
     card.setStep(TUTORIAL_STEPS[3]!);
-    expect(el.querySelector(".tut-title")!.textContent).toBe("CLEAN IT");
+    expect(el.querySelector(".tut-title")!.textContent).toBe("STEP 3 — PROCESS IT"); // index 3 still the cleaner step
     expect(el.querySelectorAll(".tut-chip")).toHaveLength(2);
   });
 

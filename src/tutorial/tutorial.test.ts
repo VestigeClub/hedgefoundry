@@ -54,10 +54,11 @@ function toMoneyStep(): { w: World; t: Tutorial } {
 }
 
 describe("tutorial step engine", () => {
-  it("declares exactly the 10 designed steps", () => {
-    expect(TUTORIAL_STEPS).toHaveLength(10);
+  it("declares exactly the 11 designed steps", () => {
+    expect(TUTORIAL_STEPS).toHaveLength(11);
     expect(TUTORIAL_STEPS[0]!.id).toBe("welcome");
-    expect(TUTORIAL_STEPS[9]!.id).toBe("sendoff");
+    expect(TUTORIAL_STEPS[7]!.id).toBe("supply");
+    expect(TUTORIAL_STEPS[10]!.id).toBe("sendoff");
   });
 
   it("advances one step at a time, in order", () => {
@@ -111,7 +112,7 @@ describe("tutorial step engine", () => {
     expect(t.snapshot.step).toBe(6);
   });
 
-  it("steps 6–8 trigger on tower, hire, research target", () => {
+  it("steps 6–9 trigger on tower, ammo belt, hire, research target", () => {
     const { w, t } = toMoneyStep();
     w.capital = w.capital + 10_001;
     t.update(w, DT, { cameraMoved: false }); // → 6 defend
@@ -119,16 +120,31 @@ describe("tutorial step engine", () => {
 
     place(w, "tower");
     t.update(w, DT, { cameraMoved: false });
-    expect(t.snapshot.step).toBe(7); // → hire
+    expect(t.snapshot.step).toBe(7); // → supply
+
+    place(w, "printer"); // printer alone must NOT advance — ammo must reach the tower
+    t.update(w, DT, { cameraMoved: false });
+    expect(t.snapshot.step).toBe(7);
+    const tower = [...w.entities.values()].find((e) => e.kind === "tower")!;
+    let belt = false;
+    for (const d of [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]) {
+      if (w.placeEntity("belt", tower.x + d.x, tower.y + d.y)) {
+        belt = true;
+        break;
+      }
+    }
+    expect(belt).toBe(true);
+    t.update(w, DT, { cameraMoved: false });
+    expect(t.snapshot.step).toBe(8); // → hire
 
     const bro = w.spawnBro("analyst", 10, 10);
     expect(w.hireBro(bro!.id)).toBe(true);
     t.update(w, DT, { cameraMoved: false });
-    expect(t.snapshot.step).toBe(8); // → research
+    expect(t.snapshot.step).toBe(9); // → research
 
     w.setResearchTarget("tape-speed-1");
     t.update(w, DT, { cameraMoved: false });
-    expect(t.snapshot.step).toBe(9); // → sendoff
+    expect(t.snapshot.step).toBe(10); // → sendoff
   });
 
   it("highlights resolve to world-space rects for every step", () => {
@@ -147,5 +163,22 @@ describe("tutorial step engine", () => {
     expect(troubleTip(w)).toBeNull();
     w.multiplier = 0.5;
     expect(troubleTip(w)).toMatch(/brownout/i);
+  });
+
+  it("troubleTip names a dry tower and clears with ammo", () => {
+    const w = makeWorld();
+    const e = place(w, "tower");
+    w.powered.add(e.id);
+    expect((e.input?.items.brief ?? 0) > 0).toBe(true); // ships loaded
+    if (e.input) {
+      e.input.items.brief = 0;
+      e.input.total = 0;
+    }
+    expect(troubleTip(w)).toMatch(/ammo/i);
+    if (e.input) {
+      e.input.items.brief = 2;
+      e.input.total = 2;
+    }
+    expect(troubleTip(w)).toBeNull();
   });
 });

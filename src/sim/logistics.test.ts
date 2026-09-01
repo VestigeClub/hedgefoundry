@@ -83,6 +83,8 @@ describe("delivery targets", () => {
   it("a belt head feeding a compliance tower delivers briefs", () => {
     const w = makeWorld();
     const tower = place(w, "tower", 60, 60, 6);
+    tower.input!.items.brief = 0;
+    tower.input!.total = 0; // drain the starter briefs: this tests belt delivery
     feedInto(w, tower, "brief");
     tick(w, 0.2);
     expect(tower.input!.items.brief).toBe(1);

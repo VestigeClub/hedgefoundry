@@ -1,5 +1,5 @@
 import type { World, Entity } from "../sim/world";
-import { BRO_STATS, HIRE_QUOTA, KIND_LABEL, ROADSHOW_ALPHA_NEEDED, VAULT_CAPACITY } from "../sim/world";
+import { BRO_STATS, HIRE_QUOTA, INSTRUMENT, KIND_LABEL, ROADSHOW_ALPHA_NEEDED, VAULT_CAPACITY } from "../sim/world";
 import { RECIPE_LABEL, sellableFuels } from "../sim/recipes";
 import { POSITION_SIZE_USD, pnlOf } from "../sim/positions";
 import { scaleFor, type Crafter } from "../sim/production";
@@ -129,18 +129,18 @@ export class Panel {
       if (e.kind === "trading") {
         for (const s of ["BTC", "ETH", "SOL"]) {
           const px = w.prices[s];
-          parts.push(`<div class="p-row">${s}: ${px === undefined ? "NO TAPE" : fmt(px)} <button class="hire-btn" data-open="${s}:long">LONG</button> <button class="hire-btn" data-open="${s}:short">SHORT</button></div>`);
+          parts.push(`<div class="p-row">${INSTRUMENT[s] ?? s}: ${px === undefined ? "NO TAPE" : fmt(px)} <button class="hire-btn" data-open="${s}:long">LONG</button> <button class="hire-btn" data-open="${s}:short">SHORT</button></div>`);
         }
         for (const p of w.positions) {
           const live = w.prices[p.symbol];
           const pnl = live === undefined ? 0 : pnlOf(p, live);
           const left = Math.max(0, p.closesMs - w.timeMs);
           parts.push(
-            `<div class="p-row">#${p.id} ${p.dir.toUpperCase()} ${p.symbol} $${fmt(p.sizeUsd)} · <span class="pill ${pnl >= 0 ? "up" : "down"}">${pnl >= 0 ? "+" : "−"}$${fmt(Math.abs(pnl))}</span> · ${Math.ceil(left / 1000)}s <button class="hire-btn" data-close="${p.id}">CLOSE</button></div>`,
+            `<div class="p-row">#${p.id} ${p.dir.toUpperCase()} ${INSTRUMENT[p.symbol] ?? p.symbol} $${fmt(p.sizeUsd)} · <span class="pill ${pnl >= 0 ? "up" : "down"}">${pnl >= 0 ? "+" : "−"}$${fmt(Math.abs(pnl))}</span> · ${Math.ceil(left / 1000)}s <button class="hire-btn" data-close="${p.id}">CLOSE</button></div>`,
           );
         }
         for (const c of w.positionLog.slice(-10).reverse()) {
-          parts.push(`<div class="p-row dim">${c.dir.toUpperCase()} ${c.symbol} $${fmt(c.sizeUsd)} → ${c.pnl >= 0 ? "+" : "−"}$${fmt(Math.abs(c.pnl))}</div>`);
+          parts.push(`<div class="p-row dim">${c.dir.toUpperCase()} ${INSTRUMENT[c.symbol] ?? c.symbol} $${fmt(c.sizeUsd)} → ${c.pnl >= 0 ? "+" : "−"}$${fmt(Math.abs(c.pnl))}</div>`);
         }
       }
       if (e.kind === "link") parts.push(`<div class="p-row">RANGE: 7 tiles</div>`);

@@ -110,7 +110,7 @@ describe("finance bros", () => {
   });
 
   it("a bro attacks and destroys an adjacent tower", () => {
-    // The other half of BRO_TARGETS. No vault and no briefs, so the tower cannot
+    // The other half of BRO_TARGETS. No vault, so the tower cannot
     // fire (update.ts:566,570) and this measures pure bro damage: the bro closes to
     // 1.58 tiles in ~0.3 s, then lands analyst's 2 dmg once per atkCdMs = 1000 ms
     // (update.ts:472-475) — ceil(5 ÷ 2) = 3 hits, tower gone at 2.43 s.
@@ -121,8 +121,8 @@ describe("finance bros", () => {
     const broId = spawnBro(w, "analyst", 33, 30); // 2.55 tiles off (SIZES.tower = 2)
     tick(w, 4); // 3 hits at 1/s: 2.43 s, so 4 s is ~1.6× margin
     expect(w.entities.has(t.id)).toBe(false);
-    expect(w.entities.has(broId)).toBe(true); // the unarmed tower never shot back
-    expect(t.input!.total).toBe(0);
+    expect(w.entities.has(broId)).toBe(true); // the unpowered tower never shot back
+    expect(t.input!.total).toBe(4); // starter briefs: bought, but no power = no shots
   });
 
   it("bros march toward the HQ when impact is flat", () => {
@@ -157,6 +157,8 @@ describe("finance bros", () => {
     drainSouth(w, m, 24);
     const ts = findSpot(w, "tower", f.x - 5, f.y, 2);
     const t = w.placeEntity("tower", ts.x, ts.y)!;
+    t.input!.items.brief = 0;
+    t.input!.total = 0; // drain starter ammo: this test is bro damage vs a silent tower
     t.hp = 10;
     t.maxHp = 10;
     spawnBro(w, "analyst", ts.x + 4, ts.y); // 3.54 tiles: in chase range (10), not attack (1.7)
@@ -176,11 +178,13 @@ describe("compliance towers", () => {
     const w = makeWorld();
     powerNear(w, 30, 30);
     const t = w.placeEntity("tower", 30, 30)!;
+    t.input!.items.brief = 0;
+    t.input!.total = 0; // start from empty: the assertions below count shots fired
     bufferAdd(t.input!, "brief", 5);
     const broId = spawnBro(w, "analyst", 35, 30); // 20hp vs 8 dmg/hit @2/s
     tick(w, 3);
     expect(w.entities.has(broId)).toBe(false);
-    expect(t.input!.items.brief ?? 0).toBeLessThan(5);
+    expect(t.input!.items.brief ?? 0).toBeLessThan(5); // ammo was consumed to kill
   });
 
   it("tower without power does nothing", () => {

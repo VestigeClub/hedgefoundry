@@ -196,7 +196,9 @@ desk moves on. Desk idles without a target. Current tree (12 techs):
   quota, and each gives +0.5% alpha output globally** (they run the factory).
   Comp scales with type + evolution.
 - **Compliance Towers** (2×2): fire Legal Briefs (2/s, range 12, damage 8).
-  Need ammo from Legal Printers + belts. Bro death = brief consumed
+  Need ammo from Legal Printers + belts. A freshly built tower ships loaded
+  with 4 briefs (first-wave fire while the printer pipeline gets built);
+  sustained ammo remains the printer's job. Bro death = brief consumed
   (no drops).
 - Defense techs (M5): Compliance Range I (+4 tiles), Tower Damage I/II
   (+8/+16), Brief Efficiency (printers output 3).
@@ -340,20 +342,23 @@ does the thing; each `done` predicate reads `World` state. The engine
 | # | Card title | Trigger (`done` on World) | Highlight |
 |---|---|---|---|
 | 0 | WELCOME TO THE FUND | camera moved ≥ 0.5 tiles or 12 s | HQ |
-| 1 | FIRST EXTRACTION (`1`) | a `miner` exists | nearest feed patch |
+| 1 | MINE (`1`) | a `miner` exists | nearest feed patch |
 | 2 | MOVE THE TAPE (`0`) | a `belt` adjacent to a miner | the miner |
 | 3 | CLEAN IT (`2`) | a `cleaner` exists | cleaner spot |
 | 4 | FUND IT (`7`) | a `funding` exists | funding spot |
 | 5 | MONEY FLOWING | capital trough + $10k | — |
 | 6 | DEFEND (`e`) | a `tower` exists | HQ |
-| 7 | HIRE | `hired ≥ 1` | nearest bro, else HQ |
-| 8 | RESEARCH (`T`) | `researchTarget !== null` | research panel |
-| 9 | GO BIG | click-through → done forever | — |
+| 7 | AMMO (`5`) | a `printer` exists AND a `belt` adjacent to a tower | tower |
+| 8 | HIRE | `hired ≥ 1` | nearest bro, else HQ |
+| 9 | RESEARCH (`T`) | `researchTarget !== null` | research panel |
+| 10 | RUN THE FUND | click-through → done forever | — |
 
 Presentation: pulsing cyan (`#00C8FF`) world-space ring on the existing
 canvas; chain diagrams as inline HTML chips; failure-aware one-line trouble
-tips (brownout / starved line) reuse the same card slot. Card copy is
-finance-native, ≤ 2 lines body.
+tips (brownout / starved line / dry tower) reuse the same card slot. Card
+copy is finance-native, ≤ 3 lines body; the step order teaches the full
+survival loop: money → power → defense (tower ships with 4 briefs, printer
+resupplies) → hire → research.
 
 ## 9. End-game report (victory AND defeat)
 Full-screen report: AUM/capital curve, production totals per item, bros hired

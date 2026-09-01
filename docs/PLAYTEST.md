@@ -161,3 +161,29 @@ on sight and researches a shortlist — those rows are the demo's, not the
 scripted arc's (94 waves, twelve techs). And the graded debt this addendum
 does **not** pay: it is still scripted input. A human hand has reached the win
 overlay via the demo, not by playing there; limitation 1 above stands.
+
+## Addendum — 2026-09-01, unfamiliar-user pass (the one human test)
+
+The owner had an unfamiliar player — never seen, never told the mechanics —
+play the **then-live graded URL** (`https://vestigeclub.github.io/hedgefoundry/`,
+bundle `index-BtFhA4PW.js`) and report friction afterwards. Four things came
+back, all genuine, all reproduced on the current build afterwards:
+
+| Friction (as reported) | Repro on current build | Revision |
+|---|---|---|
+| "A box flashes over the panel" | Confirmed in code + DOM: the minimap sat fixed top-left **under** the inspector; its live repaint bled through the panel over any selection | z-order fix (`#minimap` z-5), `src/style.css` |
+| "Kept losing; the loop is confusing" | Tutorial stopped at income — never taught power radius or ammo. Live repro: tower fired its 4 starter briefs, ran dry, fund overrun by wave 10 with a printer never built | 11-step tutorial (DESIGN.md §8a): goal, loop, **power**, **ammo** as explicit steps; dry-tower trouble tip |
+| "The tower didn't shoot back" | By design at the time: towers started empty until a full printer chain existed | towers ship with 4 briefs (§5.8); AMMO row + `troubleTip` name it |
+| "Why are there bitcoin prices?" | Ticker/panels showed BTC/ETH/SOL | instruments renamed FLUX / ORBIT / ZENITH in-game (`INSTRUMENT`), internal symbols unchanged |
+
+**Verified revision:** the fixes above as the 2026-09-01 commits — gate
+`npm run check` clean (176 tests / 26 files), production bundle
+`index-c-Xw1t57.js` (101.8 kB, 35.7 kB gz), each friction point re-checked
+live in headless Chromium on that bundle (starter ammo 4/4 → fired to 0 with
+a kill, powered-state readback, ticker labels, minimap occlusion). Screenshot:
+`playtest/06-onboarding.webp` — the new player's first card in his first
+seconds.
+
+Limitation, stated plainly: this pays the "friction + verified fix" debt, not
+limitation 1. The player's next session has not happened yet; no human has
+completed the 11-step tutorial unaided.

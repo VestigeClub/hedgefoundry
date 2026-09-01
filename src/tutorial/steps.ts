@@ -96,76 +96,96 @@ function beltAdjacentToMiner(w: World): boolean {
   return false;
 }
 
+/** Any belt touching a tower — the printer ammo feed the SUPPLY step teaches. */
+function beltAdjacentToTower(w: World): boolean {
+  for (const b of w.entities.values()) {
+    if (b.kind !== "belt") continue;
+    for (const t of w.entities.values()) {
+      if (t.kind !== "tower") continue;
+      if (b.x >= t.x - 1 && b.x <= t.x + t.w && b.y >= t.y - 1 && b.y <= t.y + t.h) return true;
+    }
+  }
+  return false;
+}
+
 export const TUTORIAL_STEPS: TutorialStep[] = [
   {
     id: "welcome",
-    title: "WELCOME TO THE FUND",
-    body: "Pan (drag / WASD), zoom (wheel). This is your Fund Office — it dies, you die. $400k to work with.",
+    title: "THE FUND — YOUR GOAL",
+    body: "Win: hire 250 Finance Bros and IPO. Lose: the bros overrun your Fund Office. Everything costs Capital, and buildings BURN capital every second — income must outpace the burn. Pan: drag / WASD. Zoom: wheel.",
     highlight: (w) => rectOf(hq(w)),
     done: (_w, ctx) => ctx.cameraMoved || ctx.elapsedMs >= 12_000,
   },
   {
     id: "miner",
-    title: "FIRST EXTRACTION",
-    body: "Press 1 — a Data Miner only mounts ON a Data Feed patch. Richness = rate multiplier (1.0–2.2×). Pick the best patch you can see.",
+    title: "STEP 1 — MINE THE TAPE",
+    body: "Press 1, then click a glowing Data Feed patch (the ring). A Data Miner mines Raw Tape off it — the raw ore of this game. Richer patch = faster mining.",
     highlight: (w) => rectOf(nearestFeed(w)),
     done: (w) => firstOf("miner")(w) !== null,
   },
   {
     id: "belt",
-    title: "MOVE THE TAPE",
-    body: "Press 0 — Ticker Tape carries Raw Tape to the next desk. Two lanes, flows one way. Belt = $800.",
+    title: "STEP 2 — MOVE IT",
+    body: "Press 0, then click tiles to lay Ticker Tape. Belts carry items ONE WAY along the arrows (press R to rotate). Lay one so its arrow points INTO the miner's output — tape rides the belt.",
     highlight: (w) => rectOf(firstOf("miner")(w)),
     done: (w) => beltAdjacentToMiner(w),
   },
   {
     id: "cleaner",
-    title: "CLEAN IT",
-    body: "Press 2 — Signal Cleaner turns Raw Tape into Clean Signal. Chain: miner → cleaner, belt between.",
+    title: "STEP 3 — PROCESS IT",
+    body: "Press 2 — a Signal Cleaner eats Raw Tape and makes CLEAN SIGNAL ($250 each). Put it one belt downstream of the miner: miner → belt → cleaner. Machines only work when powered: every desk powers things within 7 tiles of itself.",
     chips: ["TAPE", "CLEAN"],
     highlight: (w) => rectOf(firstOf("miner")(w)),
     done: (w) => firstOf("cleaner")(w) !== null,
   },
   {
     id: "funding",
-    title: "FUND IT",
-    body: "Press 7 — Funding Desk SELLS its fuel for Capital (clean $250, signal $900, alpha $3.5k). No fuel, no income.",
+    title: "STEP 4 — SELL IT",
+    body: "Press 7 — a Funding Desk SELLS fuel for capital: clean $250, signal $900, alpha $3.5k. Belt Clean into it, and keep it within 7 tiles of a desk or Vault ($8, 7/8) so the line stays powered. This is the money loop — scale it with more miner lines.",
     chips: ["CLEAN", "$"],
     highlight: (w) => rectOf(firstOf("cleaner")(w)),
     done: (w) => firstOf("funding")(w) !== null,
   },
   {
     id: "income",
-    title: "MONEY FLOWING",
-    body: "First line live: miner→cleaner→desk ≈ +$220/s, pays itself off in ~110 s. This ladder is the whole game — scale it.",
+    title: "STEP 5 — INCOME ONLINE",
+    body: "First line live: miner → cleaner → desk ≈ +$220/s. Watch CAPITAL climb in the top right. The first Finance Bro reaches your office in about a minute — check the NEXT WAVE dial, and keep this card in view.",
     highlight: () => null,
     done: (w, ctx) => w.capital >= ctx.trough + 10_000,
   },
   {
     id: "defend",
-    title: "DEFEND",
-    body: "Press e — Finance Bros raid from the edges and hit your office. First wave imminent. Compliance Tower = $15k.",
+    title: "STEP 6 — ARMS",
+    body: "Press E, then click next to the Fund Office: a Compliance Tower ($15k) shoots bros with Legal Briefs and holds their aggro. It ships with 4 briefs — four shots, no more. It must sit within 7 tiles of a desk/Vault to have power.",
     highlight: (w) => rectOf(hq(w)),
     done: (w) => firstOf("tower")(w) !== null,
   },
   {
+    id: "supply",
+    title: "STEP 7 — AMMO",
+    body: "An empty tower is a wall, not a gun — this is how funds die. Press 5: a Legal Printer ($12k) turns Clean + Signal into Legal Briefs. Belt the briefs INTO the tower. Watch the AMMO line in the tower's inspector.",
+    chips: ["CLEAN", "SIGNAL", "BRIEFS", "TOWER"],
+    highlight: (w) => rectOf(firstOf("tower")(w)),
+    done: (w) => firstOf("printer")(w) !== null && beltAdjacentToTower(w),
+  },
+  {
     id: "hire",
-    title: "HIRE",
-    body: "Bros you don't kill, you hire: click one. Comp charged once ($4k–$50k). Quota: 250 heads to IPO.",
+    title: "STEP 8 — HIRE",
+    body: "Bros you don't kill, you hire: click one, then press HIRE in its panel. Comp is charged once ($4k–$50k) and hired bros work your machines for free. 250 heads = IPO. That's the win — everything you built feeds it.",
     highlight: (w) => rectOf(nearestBroOrHq(w)),
     done: (w) => w.hired >= 1,
   },
   {
     id: "research",
-    title: "RESEARCH",
-    body: "Press T — Research Desk (1 alpha + 1 signal per craft) points at a tech. Set a target; it's your ceiling, not money.",
+    title: "STEP 9 — UPGRADE",
+    body: "Press T — a Research Desk ($20k, crafts 1 alpha + 1 signal) unlocks techs: belt/miner/cleaner speed, tower range and damage. Click a tech to set the target. Alpha is your ceiling — money is your speed.",
     highlight: () => null,
     done: (w) => w.researchTarget !== null,
   },
   {
     id: "sendoff",
-    title: "GO BIG",
-    body: "You know the loop. Scale the ladder to alpha, build the Roadshow ($120k), hire the quota, IPO. X demolishes — half refund. This is not a step — it's a send-off.",
+    title: "RUN THE FUND",
+    body: "The loop: mine → belt → process → sell → defend (tower + briefs) → hire → research. Waves arrive every 20 s and evolve. X demolishes (half refund), H help, Space pause, = speeds up. Scale the ladder to alpha, hire the quota, IPO.",
     highlight: () => null,
     done: (_w, ctx) => ctx.elapsedMs >= 8_000,
   },
@@ -176,6 +196,11 @@ const BROWNOUT = "Brownout: build Funding Desks and Treasury Vaults (7/8) — po
 
 /** One-line contextual tip for the card's trouble slot, or null. */
 export function troubleTip(w: World): string | null {
+  for (const e of w.entities.values()) {
+    if (e.kind === "tower" && w.powered.has(e.id) && (e.input?.items.brief ?? 0) === 0) {
+      return "Tower out of ammo: belt Legal Briefs from a printer (5) into the tower.";
+    }
+  }
   if (w.multiplier < 1) return BROWNOUT;
   for (const e of w.entities.values()) {
     if (

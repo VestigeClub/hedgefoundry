@@ -1,3 +1,4 @@
+import { INSTRUMENT } from "../sim/world";
 import type { MarketFrame } from "../market/types";
 
 const fmtPrice = (v: number): string =>
@@ -40,7 +41,7 @@ export class Ticker {
     const el = document.createElement("span");
     el.className = "tick-coin";
     el.innerHTML = `<b></b><span class="px">—</span><span class="arrow flat">•</span><span class="fnd"></span>`;
-    el.querySelector("b")!.textContent = coin;
+    el.querySelector("b")!.textContent = INSTRUMENT[coin] ?? coin;
     this.root.appendChild(el);
     const entry: TickerEntry = {
       el,
