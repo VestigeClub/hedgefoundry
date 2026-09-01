@@ -182,7 +182,7 @@ Full findings, repro, and the friction table: **Deep dive B** below and the
 **Verification:** gate 176/26; live headless repro of the tester's exact
 death (starter rounds fired, then dry tower, overrun at wave 10); clean
 first-visitor boot on the graded URL showing `THE FUND — YOUR GOAL` with
-zero console errors; screenshot `playtest/06-onboarding.webp`.
+zero console errors; screenshot `docs/playtest/06-onboarding.webp`.
 
 ## How the agents were used
 
@@ -378,7 +378,7 @@ green**, production bundle `index-c-Xw1t57.js` (101.8 kB, 35.7 kB gz). Live
 repro of the tester's death loop on the new build: tower shipped 4/4 briefs,
 powered from the vault, fired every round (ammo 4→0, 1 kill), then stood dry
 with no printer — overrun at wave 10. That is exactly the hole STEP 7 — AMMO
-now closes; screenshot `playtest/06-onboarding.webp`. A powered, dry,
+now closes; screenshot `docs/playtest/06-onboarding.webp`. A powered, dry,
 unresupplied tower is now impossible to mistake for a working defense.
 
 Honest limit unchanged: the unfamiliar player is one person, and his session
