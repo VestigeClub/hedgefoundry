@@ -184,6 +184,26 @@ death (starter rounds fired, then dry tower, overrun at wave 10); clean
 first-visitor boot on the graded URL showing `THE FUND — YOUR GOAL` with
 zero console errors; screenshot `docs/playtest/06-onboarding.webp`.
 
+## Phase 10 — Amber tells, quieted during onboarding (2026-09-01)
+
+**Prompt:** the owner, playing the shipped build: on the placement steps
+"two boxes, one yellow one blue, the yellowish one keeps flashing on top of
+the blue one."
+
+**Changes:** `c6740ee`..— the yellow was the machine state tells: a
+powered-but-starved or jammed machine pulses its glyph/progress bar amber
+(`JAM_AMBER`, two different sine frequencies — added by the feel pass as
+honest feedback). During the tutorial that pulse fires on exactly the tile
+the ring points at and the ghost hovers, so it read as a glitch. While the
+card is up the tells now render **static amber**; the flash resumes the
+moment onboarding ends (DESIGN.md §8a amended; `H`-help gained a TELLS
+legend naming both tells).
+
+**Verification:** live pixel signature on the dev bundle — amber glyph
+pixels of a powered-starved cleaner, 11 samples across a pulse cycle:
+**186–188 (flat) with the tutorial up**, **187→153→0→157→187 (full sine)
+after skip**; gate green (typecheck, 176/26, build `index-BVZSkmck.js`).
+
 ## How the agents were used
 
 The pattern is constant: specify → let the agent build → verify on the

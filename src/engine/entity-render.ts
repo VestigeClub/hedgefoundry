@@ -79,16 +79,29 @@ function sz(s: Screen, tiles: number): number {
   return tiles * TILE_SIZE * s.cam.zoom;
 }
 
-export function drawEntities(ctx: CanvasRenderingContext2D, world: World, cam: Camera, timeMs: number): void {
+export function drawEntities(
+  ctx: CanvasRenderingContext2D,
+  world: World,
+  cam: Camera,
+  timeMs: number,
+  quietPulse = false,
+): void {
   const s: Screen = { ctx, cam };
   const v = cam.visibleTiles(TILE_SIZE);
   for (const e of world.entities.values()) {
     if (e.x + e.w <= v.x0 || e.y + e.h <= v.y0 || e.x > v.x1 || e.y > v.y1) continue;
-    drawEntity(s, e, world.powered.has(e.id), world.working.has(e.id), timeMs);
+    drawEntity(s, e, world.powered.has(e.id), world.working.has(e.id), timeMs, quietPulse);
   }
 }
 
-function drawEntity(s: Screen, e: Entity, powered: boolean, working: boolean, timeMs: number): void {
+function drawEntity(
+  s: Screen,
+  e: Entity,
+  powered: boolean,
+  working: boolean,
+  timeMs: number,
+  quietPulse: boolean,
+): void {
   if (e.kind === "belt") {
     drawBelt(s, e, timeMs);
     return;
@@ -155,8 +168,12 @@ function drawEntity(s: Screen, e: Entity, powered: boolean, working: boolean, ti
   if (crafter?.crafting) {
     const p = crafter.progressMs / crafter.recipe.timeMs;
     ctx.fillStyle = crafter.blocked ? JAM_AMBER : color;
-    ctx.globalAlpha = crafter.blocked ? 0.55 + 0.45 * Math.abs(Math.sin(timeMs * 0.004)) : 0.9;
-    ctx.fillRect(x + 4, y + h - 6, (w - 8) * p, 3);
+    // While the tutorial card is up these tells read as a glitch, not a state
+    // (§8a: the tester saw "a yellow box flashing on the blue one") — the
+    // amber stays, the flash waits for after the tutorial.
+    ctx.globalAlpha = crafter.blocked
+      ? (quietPulse ? 0.85 : 0.55 + 0.45 * Math.abs(Math.sin(timeMs * 0.004)))
+      : 0.9;
     ctx.globalAlpha = 1;
   }
 
@@ -170,7 +187,7 @@ function drawEntity(s: Screen, e: Entity, powered: boolean, working: boolean, ti
     ctx.fillStyle = color;
     if (starved) {
       ctx.fillStyle = JAM_AMBER;
-      ctx.globalAlpha = 0.3 + 0.6 * Math.abs(Math.sin(timeMs * 0.003 + e.id));
+      ctx.globalAlpha = quietPulse ? 0.8 : 0.3 + 0.6 * Math.abs(Math.sin(timeMs * 0.003 + e.id));
     } else if (!powered) {
       ctx.globalAlpha = 0.45;
     }

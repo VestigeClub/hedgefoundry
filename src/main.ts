@@ -452,6 +452,9 @@ function renderFrame(_alpha: number): void {
   // Tutorial: check triggers at its own throttle, patch the card, resolve the
   // ring target for this frame (DESIGN.md §8a).
   let tutorialTarget: TutorialRect | null = null;
+  // Amber jam/starve tells render static (no flash) while the card is up —
+  // to a first-timer they read as a glitch on top of the ring/ghost (§8a).
+  let quietPulse = false;
   if (tutorial && tutorialCard && world.state === "playing") {
     const moved = tutorialHome
       ? Math.abs(camera.x - tutorialHome.x) + Math.abs(camera.y - tutorialHome.y) > 16
@@ -466,6 +469,7 @@ function renderFrame(_alpha: number): void {
     }
     tutorialCard.setTrouble(snap.done ? null : snap.trouble);
     if (!snap.done && step) tutorialTarget = step.highlight(world);
+    quietPulse = !snap.done;
   }
 
   drainCues();
@@ -474,7 +478,7 @@ function renderFrame(_alpha: number): void {
   ctx.translate(fx.shakeX, fx.shakeY);
   drawMap(ctx, world.map, camera, world.timeMs);
   drawImpact(ctx, world, camera);
-  drawEntities(ctx, world, camera, world.timeMs);
+  drawEntities(ctx, world, camera, world.timeMs, quietPulse);
   if (tutorialTarget) drawHighlight(ctx, camera, tutorialTarget, world.timeMs);
   ctx.restore();
   build.drawGhost(ctx);

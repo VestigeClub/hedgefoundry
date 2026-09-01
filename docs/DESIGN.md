@@ -358,7 +358,9 @@ canvas; chain diagrams as inline HTML chips; failure-aware one-line trouble
 tips (brownout / starved line / dry tower) reuse the same card slot. Card
 copy is finance-native, ≤ 3 lines body; the step order teaches the full
 survival loop: money → power → defense (tower ships with 4 briefs, printer
-resupplies) → hire → research.
+resupplies) → hire → research. While the card is up, the amber jam/starve
+machine tells render static — the flash resumes only after onboarding, so a
+state tell never reads as a glitch on top of the ring or the build ghost.
 
 ## 9. End-game report (victory AND defeat)
 Full-screen report: AUM/capital curve, production totals per item, bros hired

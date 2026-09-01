@@ -19,6 +19,11 @@ export class HelpOverlay {
           <dt>B</dt><dd>blueprint copy / paste</dd>
           <dt>H</dt><dd>help</dd>
         </dl>
+        <div class="help-title">TELLS</div>
+        <dl>
+          <dt>AMBER FLASH</dt><dd>jammed (output full) or starved (no input)</dd>
+          <dt>GRAY</dt><dd>unpowered — build a Vault or Funding Desk within 7</dd>
+        </dl>
         <div class="help-dim">click or H to close</div>
       </div>`;
     this.el.addEventListener("click", () => this.hide());
